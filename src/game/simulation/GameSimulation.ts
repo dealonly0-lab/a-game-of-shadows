@@ -5,10 +5,14 @@ import {
   BEAM_RANGE,
   BEAM_SPEED,
   DAWN_DURATION_MS,
+  EXPOSURE_DECAY_PER_SECOND,
+  EXPOSURE_GAIN_PER_SECOND,
+  MATCH_COUNTDOWN_MS,
   PLAYER_RADIUS,
+  PLAYER_SPAWN_GRACE_MS,
   PLAYER_SPEED
 } from './constants';
-import type { BotEntity, Entity, GameOutcome, InputActionState, LightSource, Particle, Projectile } from './types';
+import type { BotEntity, Entity, GameOutcome, InputActionState, LightSource, MatchPhase, Particle, Projectile } from './types';
 import { BOT_SPAWNS, LIGHT_DEFS, MAP_COLS, MAP_ROWS, PLAYER_SPAWN, TILE_SIZE, isWallTile } from '../content/villageMap';
 
 export class GameSimulation {
@@ -18,6 +22,11 @@ export class GameSimulation {
   readonly projectiles: Projectile[] = [];
   readonly particles: Particle[] = [];
 
+  matchPhase: MatchPhase = 'countdown';
+  countdownMs = MATCH_COUNTDOWN_MS;
+  matchElapsedMs = 0;
+  playerSpawnGraceMs = PLAYER_SPAWN_GRACE_MS;
+  playerExposure = 0;
   dawnMs = 0;
   dawnProgress = 0;
   outcome: GameOutcome = 'playing';
@@ -48,7 +57,7 @@ export class GameSimulation {
       isPlayer: false,
       cooldownMs: index * 260,
       shadow: null,
-      aiState: 'wander',
+      aiState: 'idle',
       wanderAngle: Math.random() * Math.PI * 2,
       wanderMs: 0
     }));
@@ -69,25 +78,50 @@ export class GameSimulation {
 
     const dt = deltaMs / 1000;
     this.updateLights();
+    this.updateCountdown(deltaMs);
     this.updatePlayer(deltaMs, dt, actions);
-    this.updateBots(deltaMs, dt);
     this.updateShadows();
-    this.updateProjectiles(dt);
+    this.updateExposure(dt);
+
+    if (this.matchPhase === 'active') {
+      this.updateBots(deltaMs, dt);
+      this.updateProjectiles(dt);
+      this.updateDawn(deltaMs);
+      this.updateOutcome();
+      this.matchElapsedMs += deltaMs;
+      if (this.playerSpawnGraceMs > 0) this.playerSpawnGraceMs = Math.max(0, this.playerSpawnGraceMs - deltaMs);
+    } else {
+      for (const bot of this.bots) bot.aiState = 'idle';
+    }
+
     this.updateParticles(dt);
-    this.updateDawn(deltaMs);
-    this.updateOutcome();
 
     if (this.muzzleFlashMs > 0) this.muzzleFlashMs = Math.max(0, this.muzzleFlashMs - deltaMs);
   }
 
   firePlayer(): void {
-    if (!this.player.alive || this.player.cooldownMs > 0 || this.outcome !== 'playing') return;
+    if (!this.player.alive || this.player.cooldownMs > 0 || this.outcome !== 'playing' || this.matchPhase !== 'active') return;
     this.fire(this.player);
     this.player.cooldownMs = BEAM_COOLDOWN_MS;
   }
 
   getAliveCount(): number {
     return this.bots.filter((bot) => bot.alive).length + (this.player.alive ? 1 : 0);
+  }
+
+  getPlayerDangerLevel(): number {
+    if (this.playerSpawnGraceMs > 0) return 0;
+    return this.playerExposure;
+  }
+
+  isPlayerProtected(): boolean {
+    return this.playerSpawnGraceMs > 0 || this.matchPhase !== 'active';
+  }
+
+  private updateCountdown(deltaMs: number): void {
+    if (this.matchPhase !== 'countdown') return;
+    this.countdownMs = Math.max(0, this.countdownMs - deltaMs);
+    if (this.countdownMs === 0) this.matchPhase = 'active';
   }
 
   private updateLights(): void {
@@ -187,6 +221,12 @@ export class GameSimulation {
     }
   }
 
+  private updateExposure(dt: number): void {
+    const exposed = Boolean(this.player.shadow);
+    const delta = exposed ? EXPOSURE_GAIN_PER_SECOND * dt : -EXPOSURE_DECAY_PER_SECOND * dt;
+    this.playerExposure = clamp01(this.playerExposure + delta);
+  }
+
   private updateProjectiles(dt: number): void {
     for (let index = this.projectiles.length - 1; index >= 0; index -= 1) {
       const projectile = this.projectiles[index];
@@ -205,6 +245,7 @@ export class GameSimulation {
 
       const victim = this.entities().find((entity) => {
         if (!entity.alive || entity.id === projectile.ownerId || !entity.shadow) return false;
+        if (entity.isPlayer && this.isPlayerProtected()) return false;
         return Math.hypot(entity.x - projectile.x, entity.y - projectile.y) < PLAYER_RADIUS + 7;
       });
 
@@ -236,11 +277,13 @@ export class GameSimulation {
   private updateOutcome(): void {
     if (!this.player.alive) {
       this.outcome = 'lost';
+      this.matchPhase = 'ended';
       return;
     }
 
     if (this.bots.every((bot) => !bot.alive)) {
       this.outcome = 'won';
+      this.matchPhase = 'ended';
     }
   }
 
@@ -320,6 +363,10 @@ function normalize(x: number, y: number): { x: number; y: number } {
   const length = Math.hypot(x, y);
   if (length === 0) return { x: 0, y: 0 };
   return { x: x / length, y: y / length };
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
 }
 
 function canMove(x: number, y: number, radius: number): boolean {

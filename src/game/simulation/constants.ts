@@ -6,3 +6,7 @@ export const BEAM_RANGE = 460;
 export const BEAM_COOLDOWN_MS = 780;
 export const DAWN_DURATION_MS = 70_000;
 export const BOT_COUNT = 7;
+export const MATCH_COUNTDOWN_MS = 3_000;
+export const PLAYER_SPAWN_GRACE_MS = 4_500;
+export const EXPOSURE_GAIN_PER_SECOND = 1.6;
+export const EXPOSURE_DECAY_PER_SECOND = 2.25;

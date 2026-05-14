@@ -13,6 +13,8 @@ type HudRefs = {
   souls: HTMLSpanElement;
   phase: HTMLDivElement;
   beam: HTMLDivElement;
+  dangerFill: HTMLDivElement;
+  status: HTMLDivElement;
   dawnFill: HTMLDivElement;
   gameOverTitle: HTMLHeadingElement;
   gameOverMessage: HTMLParagraphElement;
@@ -31,6 +33,7 @@ export class GameScene extends Phaser.Scene {
   private projectileLayer!: Phaser.GameObjects.Graphics;
   private particleLayer!: Phaser.GameObjects.Graphics;
   private debugLayer!: Phaser.GameObjects.Graphics;
+  private minimapLayer!: Phaser.GameObjects.Graphics;
   private darkness!: Phaser.GameObjects.RenderTexture;
   private eraseLayer!: Phaser.GameObjects.Graphics;
   private dawnOverlay!: Phaser.GameObjects.Rectangle;
@@ -70,6 +73,7 @@ export class GameScene extends Phaser.Scene {
     this.renderParticles();
     this.renderDarkness();
     this.renderDebug();
+    this.renderMinimap();
     this.updateHud();
 
     if (this.simulation.outcome !== 'playing') {
@@ -86,9 +90,11 @@ export class GameScene extends Phaser.Scene {
         <div id="phase-display" class="hud__phase">NIGHT</div>
         <div id="beam-display" class="hud__beam">BEAM READY</div>
       </div>
+      <div id="status-display" class="hud__status"></div>
       <div class="hud__bottom">
+        <div class="hud__danger"><div id="danger-fill" class="hud__danger-fill"></div></div>
         <div class="hud__bar"><div id="dawn-fill" class="hud__fill"></div></div>
-        <div class="hud__hint">WASD - Move · Mouse - Aim · Click - Fire · F1 - Debug</div>
+        <div class="hud__hint">WASD - Move - Mouse - Aim - Click - Fire - F1 - Debug</div>
       </div>
       <div id="debug-panel" class="debug-panel is-hidden"></div>
     `;
@@ -133,6 +139,8 @@ export class GameScene extends Phaser.Scene {
       souls: hud.querySelector<HTMLSpanElement>('#souls-count')!,
       phase: hud.querySelector<HTMLDivElement>('#phase-display')!,
       beam: hud.querySelector<HTMLDivElement>('#beam-display')!,
+      dangerFill: hud.querySelector<HTMLDivElement>('#danger-fill')!,
+      status: hud.querySelector<HTMLDivElement>('#status-display')!,
       dawnFill: hud.querySelector<HTMLDivElement>('#dawn-fill')!,
       gameOverTitle: gameOver.querySelector<HTMLHeadingElement>('#game-over-title')!,
       gameOverMessage: gameOver.querySelector<HTMLParagraphElement>('#game-over-message')!
@@ -150,6 +158,7 @@ export class GameScene extends Phaser.Scene {
     this.eraseLayer = this.add.graphics().setVisible(false);
     this.dawnOverlay = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x1f0900, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(21);
     this.debugLayer = this.add.graphics().setDepth(30);
+    this.minimapLayer = this.add.graphics().setDepth(31).setScrollFactor(0);
   }
 
   private setupInput(): void {
@@ -321,7 +330,13 @@ export class GameScene extends Phaser.Scene {
       const alpha = entity.isPlayer ? (inLight ? 0.56 : 0.22) : inLight ? 0.5 : 0.04;
       g.fillStyle(color, alpha).fillCircle(entity.x, entity.y, PLAYER_RADIUS);
 
-      if (entity.isPlayer) this.drawAim(g, entity);
+      if (entity.isPlayer) {
+        if (this.simulation.isPlayerProtected()) {
+          g.lineStyle(2, 0x90c8ff, 0.52);
+          g.strokeCircle(entity.x, entity.y, PLAYER_RADIUS + 11);
+        }
+        this.drawAim(g, entity);
+      }
     }
   }
 
@@ -442,13 +457,81 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private renderMinimap(): void {
+    const g = this.minimapLayer.clear();
+    const width = 184;
+    const height = Math.round(width * (MAP_HEIGHT / MAP_WIDTH));
+    const x = this.scale.width - width - 24;
+    const y = this.scale.height - height - 24;
+    const sx = width / MAP_WIDTH;
+    const sy = height / MAP_HEIGHT;
+
+    g.fillStyle(0x020008, 0.72);
+    g.fillRect(x, y, width, height);
+    g.lineStyle(1, 0xd4a843, 0.34);
+    g.strokeRect(x, y, width, height);
+
+    for (let row = 0; row < MAP_ROWS; row += 1) {
+      for (let col = 0; col < MAP_COLS; col += 1) {
+        const tile = MAP_DATA[row][col];
+        if (tile === TileKind.Wall) {
+          g.fillStyle(0x433052, 0.82);
+        } else if (tile === TileKind.Grave || tile === TileKind.Tree) {
+          g.fillStyle(0x2d2440, 0.72);
+        } else {
+          continue;
+        }
+
+        g.fillRect(x + col * TILE_SIZE * sx, y + row * TILE_SIZE * sy, Math.ceil(TILE_SIZE * sx), Math.ceil(TILE_SIZE * sy));
+      }
+    }
+
+    for (const light of this.simulation.lights) {
+      g.fillStyle(light.kind === 'bonfire' ? 0xff8844 : 0xffdd88, 0.75);
+      g.fillCircle(x + light.x * sx, y + light.y * sy, light.kind === 'bonfire' ? 2.4 : 1.8);
+    }
+
+    const camera = this.cameras.main;
+    g.lineStyle(1, 0x90c8ff, 0.56);
+    g.strokeRect(x + camera.scrollX * sx, y + camera.scrollY * sy, camera.width * sx, camera.height * sy);
+
+    for (const bot of this.simulation.bots) {
+      if (!bot.alive) continue;
+      g.fillStyle(bot.shadow || this.debugEnabled ? 0xe06040 : 0x5a2a24, bot.shadow || this.debugEnabled ? 0.95 : 0.42);
+      g.fillCircle(x + bot.x * sx, y + bot.y * sy, 2);
+    }
+
+    const player = this.simulation.player;
+    if (player.alive) {
+      g.fillStyle(0x80b4ff, 1);
+      g.fillCircle(x + player.x * sx, y + player.y * sy, 3.2);
+    }
+  }
+
   private updateHud(): void {
     const progress = this.simulation.dawnProgress;
     this.hud.souls.textContent = String(this.simulation.getAliveCount());
     this.hud.dawnFill.style.width = `${Math.round(progress * 100)}%`;
-    this.hud.root.classList.toggle('is-exposed', Boolean(this.simulation.player.shadow));
+    this.hud.dangerFill.style.width = `${Math.round(this.simulation.getPlayerDangerLevel() * 100)}%`;
+    this.hud.root.classList.toggle('is-exposed', Boolean(this.simulation.player.shadow) && !this.simulation.isPlayerProtected());
+    this.hud.root.classList.toggle('is-protected', this.simulation.isPlayerProtected());
 
-    if (progress < 0.3) {
+    if (this.simulation.matchPhase === 'countdown') {
+      const count = Math.max(1, Math.ceil(this.simulation.countdownMs / 1000));
+      this.hud.status.textContent = `MATCH STARTS IN ${count}`;
+      this.hud.status.classList.remove('is-hidden');
+    } else if (this.simulation.isPlayerProtected()) {
+      const shield = Math.ceil(this.simulation.playerSpawnGraceMs / 1000);
+      this.hud.status.textContent = `SHADOW VEIL ${shield}`;
+      this.hud.status.classList.remove('is-hidden');
+    } else {
+      this.hud.status.classList.add('is-hidden');
+    }
+
+    if (this.simulation.matchPhase === 'countdown') {
+      this.hud.phase.textContent = 'READY';
+      this.hud.phase.style.color = '#80b4ff';
+    } else if (progress < 0.3) {
       this.hud.phase.textContent = 'NIGHT';
       this.hud.phase.style.color = '#806040';
     } else if (progress < 0.65) {
@@ -460,7 +543,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     const cooldown = this.simulation.player.cooldownMs;
-    if (cooldown > 0) {
+    if (this.simulation.matchPhase === 'countdown') {
+      this.hud.beam.textContent = 'BEAM LOCKED';
+      this.hud.beam.style.color = 'rgba(144,200,255,0.56)';
+    } else if (cooldown > 0) {
       this.hud.beam.textContent = `CHARGING ${Math.min(99, Math.ceil((1 - cooldown / BEAM_COOLDOWN_MS) * 100))}%`;
       this.hud.beam.style.color = 'rgba(90,120,180,0.72)';
     } else {
@@ -474,8 +560,13 @@ export class GameScene extends Phaser.Scene {
       this.hud.debug.innerHTML = [
         `FPS ${Math.round(this.game.loop.actualFps)}`,
         `STATE ${this.simulation.outcome}`,
+        `PHASE ${this.simulation.matchPhase}`,
         `ALIVE ${this.simulation.getAliveCount()} / ${BOT_COUNT + 1}`,
+        `MATCH ${Math.round(this.simulation.matchElapsedMs / 1000)}s`,
+        `COUNTDOWN ${Math.round(this.simulation.countdownMs / 1000)}s`,
+        `VEIL ${Math.round(this.simulation.playerSpawnGraceMs / 1000)}s`,
         `DAWN ${Math.round(this.simulation.dawnProgress * 100)}%`,
+        `DANGER ${Math.round(this.simulation.getPlayerDangerLevel() * 100)}%`,
         `PLAYER ${Math.round(this.simulation.player.x)}, ${Math.round(this.simulation.player.y)}`,
         `EXPOSED ${this.simulation.player.shadow ? 'YES' : 'NO'}`,
         `BOTS SHADOWED ${shadowedBots}`,

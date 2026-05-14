@@ -59,9 +59,34 @@ body {
   text-shadow: 0 0 18px rgba(224, 96, 64, 0.86);
 }
 
+.hud.is-protected .hud__phase::after {
+  content: 'PROTECTED';
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #90c8ff;
+  font-size: 10px;
+  letter-spacing: 5px;
+  text-shadow: 0 0 18px rgba(144, 200, 255, 0.74);
+}
+
 .hud__beam {
   justify-self: end;
   color: rgba(180, 220, 255, 0.8);
+}
+
+.hud__status {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(212, 168, 67, 0.9);
+  font-size: clamp(18px, 3vw, 36px);
+  letter-spacing: 8px;
+  text-align: center;
+  text-shadow: 0 0 32px rgba(212, 168, 67, 0.42);
+  white-space: nowrap;
 }
 
 .hud__bottom {
@@ -74,12 +99,25 @@ body {
   justify-items: center;
 }
 
+.hud__danger,
 .hud__bar {
   width: min(240px, 56vw);
   height: 3px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 999px;
   overflow: hidden;
+}
+
+.hud__danger {
+  width: min(180px, 44vw);
+  height: 4px;
+}
+
+.hud__danger-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #5a1f1f, #e06040);
+  box-shadow: 0 0 12px rgba(224, 96, 64, 0.42);
 }
 
 .hud__fill {

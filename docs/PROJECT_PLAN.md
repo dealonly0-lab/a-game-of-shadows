@@ -187,6 +187,7 @@ Tasks:
 - Add proper match start countdown.
 - Add spawn safety.
 - Add round timer and clearer dawn phases.
+- Add minimap for larger-map orientation.
 - Add better bot AI states: patrol, investigate shadow, chase, retreat.
 - Add line-of-sight checks for bot target selection.
 - Add map hazards and risky shortcuts.
@@ -268,4 +269,3 @@ Exit check:
 3. Add debug overlay.
 4. Tune the first playable round.
 5. Only then move to stronger AI and game-feel polish.
-

@@ -80,4 +80,8 @@ Progress:
 - Bot target selection now requires line-of-sight instead of seeing exposed targets through walls.
 - Prototype map expanded from a small test board into a larger 64x36 haunted village.
 - Player spawn moved away from the edge so the camera starts inside the world instead of making the game feel side-aligned.
+- Match countdown added.
+- Player spawn protection added as `SHADOW VEIL`.
+- Danger bar added for exposed-state pressure.
+- Minimap added for orientation in the larger village.
 - Build passes after these changes.

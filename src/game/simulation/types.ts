@@ -39,7 +39,7 @@ export type Entity = {
 
 export type BotEntity = Entity & {
   isPlayer: false;
-  aiState: 'wander' | 'hunt';
+  aiState: 'idle' | 'wander' | 'hunt';
   wanderAngle: number;
   wanderMs: number;
 };
@@ -75,3 +75,4 @@ export type InputActionState = {
 };
 
 export type GameOutcome = 'playing' | 'won' | 'lost';
+export type MatchPhase = 'countdown' | 'active' | 'ended';
