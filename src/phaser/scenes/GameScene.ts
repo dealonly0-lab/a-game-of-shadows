@@ -207,10 +207,12 @@ export class GameScene extends Phaser.Scene {
     gameOver.className = 'game-over is-hidden';
     gameOver.innerHTML = `
       <div class="game-over__inner">
-        <h2 id="game-over-title" class="title__name">YOUR SHADOW FADES</h2>
+        <h2 id="game-over-title" class="game-over__title">YOUR SHADOW FADES</h2>
         <p id="game-over-message" class="game-over__message">The light found you.</p>
-        <div id="game-over-stats" class="game-over__stats"></div>
-        <div id="game-over-rewards" class="game-over__rewards"></div>
+        <div class="game-over__summary">
+          <div id="game-over-stats" class="game-over__stats"></div>
+          <div id="game-over-rewards" class="game-over__rewards"></div>
+        </div>
         <div class="game-over__actions">
           <button id="restart-button" class="button" type="button">Play Again</button>
           <button id="home-button" class="button button--secondary" type="button">Home</button>

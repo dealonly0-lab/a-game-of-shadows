@@ -113,4 +113,6 @@ Progress:
 - Home hub now supports unlocking and equipping shadow skins with Embers.
 - Equipped skin changes the player's shadow and silhouette color in matches.
 - Spawn resolution now requires open tile clearance around player and bot spawns, preventing bots from appearing inside buildings or tight door pockets.
+- Game-over title now uses result-specific typography instead of oversized home-hero typography.
+- Game-over stats and rewards now sit in bounded summary panels so long win/loss text cannot overflow the viewport.
 - Build passes after these changes.

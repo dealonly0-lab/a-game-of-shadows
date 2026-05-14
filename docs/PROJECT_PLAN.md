@@ -293,6 +293,7 @@ Tasks:
 - Add medium-width layout rules so the home hub cannot overlap on tablet or narrow desktop screens.
 - Replace plain wall blocks with first-pass haunted house rendering before the sprite pipeline.
 - Validate spawns with open-area clearance so bots and players never start inside buildings or door pockets.
+- Keep game-over result typography separate from homepage hero typography.
 
 Exit check:
 
