@@ -112,4 +112,5 @@ Progress:
 - Shadow skin catalog added with starter, rare, and epic cosmetics.
 - Home hub now supports unlocking and equipping shadow skins with Embers.
 - Equipped skin changes the player's shadow and silhouette color in matches.
+- Spawn resolution now requires open tile clearance around player and bot spawns, preventing bots from appearing inside buildings or tight door pockets.
 - Build passes after these changes.

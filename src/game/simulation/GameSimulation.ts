@@ -60,7 +60,7 @@ export class GameSimulation {
     this.variant = createMatchVariant(input);
     this.sealedTileKeys = new Set(this.variant.sealedTiles.map((tile) => tileKey(tile.col, tile.row)));
 
-    const playerSpawn = resolveSpawnPoint(this.variant.playerSpawn.col, this.variant.playerSpawn.row, (x, y) => this.canMove(x, y, PLAYER_RADIUS));
+    const playerSpawn = resolveSpawnPoint(this.variant.playerSpawn.col, this.variant.playerSpawn.row, (x, y) => this.canSpawn(x, y, 3));
     this.player = {
       id: 'player',
       x: playerSpawn.x,
@@ -73,7 +73,7 @@ export class GameSimulation {
     };
 
     this.bots = this.variant.botSpawns.slice(0, Math.min(BOT_COUNT + 3, this.variant.botCount)).map((spawn, index) => ({
-      ...createBot(index, spawn.col, spawn.row, (x, y) => this.canMove(x, y, PLAYER_RADIUS))
+      ...createBot(index, spawn.col, spawn.row, (x, y) => this.canSpawn(x, y, 2))
     }));
 
     this.lights = this.variant.lights.map((light, index) => ({
@@ -425,6 +425,20 @@ export class GameSimulation {
 
     return points.every(([px, py]) => !this.isBlocked(px, py));
   }
+
+  private canSpawn(x: number, y: number, clearanceTiles: number): boolean {
+    if (!this.canMove(x, y, PLAYER_RADIUS)) return false;
+
+    const centerCol = Math.floor(x / TILE_SIZE);
+    const centerRow = Math.floor(y / TILE_SIZE);
+    for (let row = centerRow - clearanceTiles; row <= centerRow + clearanceTiles; row += 1) {
+      for (let col = centerCol - clearanceTiles; col <= centerCol + clearanceTiles; col += 1) {
+        if (this.isBlockedTile(col, row)) return false;
+      }
+    }
+
+    return true;
+  }
 }
 
 function normalize(x: number, y: number): { x: number; y: number } {
@@ -457,18 +471,18 @@ function createBot(index: number, col: number, row: number, canMoveTo: (x: numbe
   };
 }
 
-function resolveSpawnPoint(col: number, row: number, canMoveTo: (x: number, y: number) => boolean): { x: number; y: number } {
+function resolveSpawnPoint(col: number, row: number, canSpawnAt: (x: number, y: number) => boolean): { x: number; y: number } {
   const preferredX = (col + 0.5) * TILE_SIZE;
   const preferredY = (row + 0.5) * TILE_SIZE;
-  if (canMoveTo(preferredX, preferredY)) return { x: preferredX, y: preferredY };
+  if (canSpawnAt(preferredX, preferredY)) return { x: preferredX, y: preferredY };
 
-  for (let radius = 1; radius <= 8; radius += 1) {
+  for (let radius = 1; radius <= 16; radius += 1) {
     for (let y = row - radius; y <= row + radius; y += 1) {
       for (let x = col - radius; x <= col + radius; x += 1) {
         if (Math.abs(x - col) !== radius && Math.abs(y - row) !== radius) continue;
         const worldX = (x + 0.5) * TILE_SIZE;
         const worldY = (y + 0.5) * TILE_SIZE;
-        if (canMoveTo(worldX, worldY)) return { x: worldX, y: worldY };
+        if (canSpawnAt(worldX, worldY)) return { x: worldX, y: worldY };
       }
     }
   }
