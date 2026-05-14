@@ -71,3 +71,11 @@ Requirements:
 - Bot behavior improved enough for testing.
 - Build passes.
 
+Progress:
+
+- Debug overlay added behind `F1`.
+- Collision, light radius, entity radius, and shadow debug lines added.
+- HUD shows exposed state.
+- First tuning pass completed for movement, beam, bot speed, and dawn duration.
+- Bot target selection now requires line-of-sight instead of seeing exposed targets through walls.
+- Build passes after these changes.

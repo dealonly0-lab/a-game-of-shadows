@@ -39,6 +39,7 @@ export type Entity = {
 
 export type BotEntity = Entity & {
   isPlayer: false;
+  aiState: 'wander' | 'hunt';
   wanderAngle: number;
   wanderMs: number;
 };

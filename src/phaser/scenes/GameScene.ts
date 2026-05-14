@@ -9,6 +9,7 @@ type HudRefs = {
   root: HTMLDivElement;
   title: HTMLDivElement;
   gameOver: HTMLDivElement;
+  debug: HTMLDivElement;
   souls: HTMLSpanElement;
   phase: HTMLDivElement;
   beam: HTMLDivElement;
@@ -29,12 +30,15 @@ export class GameScene extends Phaser.Scene {
   private entityLayer!: Phaser.GameObjects.Graphics;
   private projectileLayer!: Phaser.GameObjects.Graphics;
   private particleLayer!: Phaser.GameObjects.Graphics;
+  private debugLayer!: Phaser.GameObjects.Graphics;
   private darkness!: Phaser.GameObjects.RenderTexture;
   private eraseLayer!: Phaser.GameObjects.Graphics;
   private dawnOverlay!: Phaser.GameObjects.Rectangle;
 
   private isStarted = false;
+  private debugEnabled = false;
   private pointerWasDown = false;
+  private debugKeyWasDown = false;
 
   constructor() {
     super('GameScene');
@@ -56,6 +60,7 @@ export class GameScene extends Phaser.Scene {
 
     const actions = this.readActions();
     this.simulation.update(deltaMs, actions);
+    this.updateDebugToggle();
 
     this.updateCamera(deltaMs / 1000);
     this.renderLights();
@@ -64,6 +69,7 @@ export class GameScene extends Phaser.Scene {
     this.renderProjectiles();
     this.renderParticles();
     this.renderDarkness();
+    this.renderDebug();
     this.updateHud();
 
     if (this.simulation.outcome !== 'playing') {
@@ -82,8 +88,9 @@ export class GameScene extends Phaser.Scene {
       </div>
       <div class="hud__bottom">
         <div class="hud__bar"><div id="dawn-fill" class="hud__fill"></div></div>
-        <div class="hud__hint">WASD - Move · Mouse - Aim · Click - Fire</div>
+        <div class="hud__hint">WASD - Move · Mouse - Aim · Click - Fire · F1 - Debug</div>
       </div>
+      <div id="debug-panel" class="debug-panel is-hidden"></div>
     `;
 
     const title = document.createElement('div');
@@ -122,6 +129,7 @@ export class GameScene extends Phaser.Scene {
       root: hud,
       title,
       gameOver,
+      debug: hud.querySelector<HTMLDivElement>('#debug-panel')!,
       souls: hud.querySelector<HTMLSpanElement>('#souls-count')!,
       phase: hud.querySelector<HTMLDivElement>('#phase-display')!,
       beam: hud.querySelector<HTMLDivElement>('#beam-display')!,
@@ -141,6 +149,7 @@ export class GameScene extends Phaser.Scene {
     this.darkness = this.add.renderTexture(0, 0, this.scale.width, this.scale.height).setOrigin(0, 0).setScrollFactor(0).setDepth(20);
     this.eraseLayer = this.add.graphics().setVisible(false);
     this.dawnOverlay = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x1f0900, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(21);
+    this.debugLayer = this.add.graphics().setDepth(30);
   }
 
   private setupInput(): void {
@@ -154,8 +163,11 @@ export class GameScene extends Phaser.Scene {
       UP: Phaser.Input.Keyboard.KeyCodes.UP,
       DOWN: Phaser.Input.Keyboard.KeyCodes.DOWN,
       LEFT: Phaser.Input.Keyboard.KeyCodes.LEFT,
-      RIGHT: Phaser.Input.Keyboard.KeyCodes.RIGHT
+      RIGHT: Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      F1: Phaser.Input.Keyboard.KeyCodes.F1
     }) as Record<string, Phaser.Input.Keyboard.Key>;
+
+    this.input.keyboard.on('keydown-F1', (event: KeyboardEvent) => event.preventDefault());
   }
 
   private configureCamera(): void {
@@ -168,6 +180,17 @@ export class GameScene extends Phaser.Scene {
     this.hud.gameOver.classList.add('is-hidden');
     this.isStarted = true;
     this.configureCamera();
+  }
+
+  private updateDebugToggle(): void {
+    const isDown = this.keys.F1.isDown;
+    if (isDown && !this.debugKeyWasDown) {
+      this.debugEnabled = !this.debugEnabled;
+      this.hud.debug.classList.toggle('is-hidden', !this.debugEnabled);
+      this.debugLayer.clear();
+    }
+
+    this.debugKeyWasDown = isDown;
   }
 
   private readActions(): InputActionState {
@@ -390,10 +413,40 @@ export class GameScene extends Phaser.Scene {
     this.dawnOverlay.setFillStyle(0x1f0900, this.simulation.dawnProgress * 0.28);
   }
 
+  private renderDebug(): void {
+    const g = this.debugLayer.clear();
+    if (!this.debugEnabled) return;
+
+    for (let row = 0; row < MAP_ROWS; row += 1) {
+      for (let col = 0; col < MAP_COLS; col += 1) {
+        if (MAP_DATA[row][col] !== TileKind.Wall) continue;
+        g.lineStyle(1, 0x44ff88, 0.26);
+        g.strokeRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+      }
+    }
+
+    for (const light of this.simulation.lights) {
+      g.lineStyle(1, light.kind === 'bonfire' ? 0xff8844 : 0xffdd88, 0.32);
+      g.strokeCircle(light.x, light.y, light.radius);
+    }
+
+    for (const entity of this.entities()) {
+      if (!entity.alive) continue;
+      g.lineStyle(1, entity.isPlayer ? 0x80b4ff : 0xff6040, 0.8);
+      g.strokeCircle(entity.x, entity.y, PLAYER_RADIUS);
+
+      if (entity.shadow) {
+        g.lineStyle(2, entity.isPlayer ? 0x80b4ff : 0xff6040, 0.55);
+        g.lineBetween(entity.x, entity.y, entity.x + entity.shadow.nx * entity.shadow.length, entity.y + entity.shadow.ny * entity.shadow.length);
+      }
+    }
+  }
+
   private updateHud(): void {
     const progress = this.simulation.dawnProgress;
     this.hud.souls.textContent = String(this.simulation.getAliveCount());
     this.hud.dawnFill.style.width = `${Math.round(progress * 100)}%`;
+    this.hud.root.classList.toggle('is-exposed', Boolean(this.simulation.player.shadow));
 
     if (progress < 0.3) {
       this.hud.phase.textContent = 'NIGHT';
@@ -413,6 +466,23 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.hud.beam.textContent = 'BEAM READY';
       this.hud.beam.style.color = 'rgba(180,220,255,0.8)';
+    }
+
+    if (this.debugEnabled) {
+      const shadowedBots = this.simulation.bots.filter((bot) => bot.alive && bot.shadow).length;
+      const huntingBots = this.simulation.bots.filter((bot) => bot.alive && bot.aiState === 'hunt').length;
+      this.hud.debug.innerHTML = [
+        `FPS ${Math.round(this.game.loop.actualFps)}`,
+        `STATE ${this.simulation.outcome}`,
+        `ALIVE ${this.simulation.getAliveCount()} / ${BOT_COUNT + 1}`,
+        `DAWN ${Math.round(this.simulation.dawnProgress * 100)}%`,
+        `PLAYER ${Math.round(this.simulation.player.x)}, ${Math.round(this.simulation.player.y)}`,
+        `EXPOSED ${this.simulation.player.shadow ? 'YES' : 'NO'}`,
+        `BOTS SHADOWED ${shadowedBots}`,
+        `BOTS HUNTING ${huntingBots}`,
+        `BEAMS ${this.simulation.projectiles.length}`,
+        `PARTICLES ${this.simulation.particles.length}`
+      ].join('<br>');
     }
   }
 

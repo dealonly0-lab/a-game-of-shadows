@@ -48,6 +48,7 @@ export class GameSimulation {
       isPlayer: false,
       cooldownMs: index * 260,
       shadow: null,
+      aiState: 'wander',
       wanderAngle: Math.random() * Math.PI * 2,
       wanderMs: 0
     }));
@@ -121,6 +122,7 @@ export class GameSimulation {
 
       const target = this.findNearestShadowedTarget(bot, 400);
       if (target) {
+        bot.aiState = 'hunt';
         bot.wanderAngle = Math.atan2(target.y - bot.y, target.x - bot.x);
         bot.angle = bot.wanderAngle;
 
@@ -130,9 +132,12 @@ export class GameSimulation {
           bot.cooldownMs = BEAM_COOLDOWN_MS + Math.random() * 1000;
         }
       } else if (bot.wanderMs <= 0) {
+        bot.aiState = 'wander';
         bot.wanderAngle += (Math.random() - 0.5) * 2.5;
         bot.angle = bot.wanderAngle;
         bot.wanderMs = 1200 + Math.random() * 2000;
+      } else {
+        bot.aiState = 'wander';
       }
 
       const dx = Math.cos(bot.wanderAngle) * BOT_SPEED * dt;
@@ -283,7 +288,7 @@ export class GameSimulation {
     for (const entity of this.entities()) {
       if (!entity.alive || entity.id === bot.id || !entity.shadow) continue;
       const distance = distanceBetween(bot, entity);
-      if (distance < maxDistance && distance < closestDistance) {
+      if (distance < maxDistance && distance < closestDistance && hasLineOfSight(bot.x, bot.y, entity.x, entity.y)) {
         closest = entity;
         closestDistance = distance;
       }
@@ -335,6 +340,20 @@ function canMove(x: number, y: number, radius: number): boolean {
 function isBlocked(x: number, y: number): boolean {
   if (x < 0 || y < 0 || x >= MAP_COLS * TILE_SIZE || y >= MAP_ROWS * TILE_SIZE) return true;
   return isWallTile(Math.floor(x / TILE_SIZE), Math.floor(y / TILE_SIZE));
+}
+
+function hasLineOfSight(x1: number, y1: number, x2: number, y2: number): boolean {
+  const distance = Math.hypot(x2 - x1, y2 - y1);
+  const steps = Math.max(1, Math.ceil(distance / (TILE_SIZE / 3)));
+
+  for (let index = 1; index < steps; index += 1) {
+    const t = index / steps;
+    const x = x1 + (x2 - x1) * t;
+    const y = y1 + (y2 - y1) * t;
+    if (isBlocked(x, y)) return false;
+  }
+
+  return true;
 }
 
 function distanceBetween(a: { x: number; y: number }, b: { x: number; y: number }): number {
