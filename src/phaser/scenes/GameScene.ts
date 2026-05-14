@@ -4,6 +4,7 @@ import { GameSimulation } from '../../game/simulation/GameSimulation';
 import { MAP_DATA, MAP_HEIGHT, MAP_WIDTH, MAP_COLS, MAP_ROWS, TILE_SIZE, TileKind, isWallTile } from '../../game/content/villageMap';
 import { buildWallSegments, Raycaster } from '../../game/simulation/raycast';
 import type { Entity, InputActionState, LightSource } from '../../game/simulation/types';
+import { applyMatchRewards, loadProfile, saveProfile, type MatchRewards, type PlayerProfile, xpProgressInLevel } from '../../game/progression/profile';
 import { GameAudio } from '../audio/GameAudio';
 
 type ImpactRipple = {
@@ -24,6 +25,7 @@ type HudNotice = {
 type HudRefs = {
   root: HTMLDivElement;
   title: HTMLDivElement;
+  titleProfile: HTMLDivElement;
   gameOver: HTMLDivElement;
   pause: HTMLDivElement;
   debug: HTMLDivElement;
@@ -37,12 +39,16 @@ type HudRefs = {
   gameOverTitle: HTMLHeadingElement;
   gameOverMessage: HTMLParagraphElement;
   gameOverStats: HTMLDivElement;
+  gameOverRewards: HTMLDivElement;
 };
 
 export class GameScene extends Phaser.Scene {
   private simulation!: GameSimulation;
   private raycaster!: Raycaster;
   private audio!: GameAudio;
+  private profile!: PlayerProfile;
+  private lastRewards: MatchRewards | null = null;
+  private rewardsApplied = false;
   private hud!: HudRefs;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
 
@@ -78,6 +84,7 @@ export class GameScene extends Phaser.Scene {
     this.simulation = new GameSimulation();
     this.raycaster = new Raycaster(buildWallSegments(isWallTile, MAP_COLS, MAP_ROWS, TILE_SIZE));
     this.audio = new GameAudio();
+    this.profile = loadProfile();
 
     this.createHud();
     this.createRenderLayers();
@@ -145,6 +152,7 @@ export class GameScene extends Phaser.Scene {
         <div class="title__eyebrow">A Game of Shadows</div>
         <h1 class="title__name">HOLLOW</h1>
         <div class="title__tagline">"Don't step in the light."</div>
+        <div id="title-profile" class="profile-card"></div>
         <button id="start-button" class="button" type="button">Enter the Village</button>
       </div>
     `;
@@ -156,6 +164,7 @@ export class GameScene extends Phaser.Scene {
         <h2 id="game-over-title" class="title__name">YOUR SHADOW FADES</h2>
         <p id="game-over-message" class="game-over__message">The light found you.</p>
         <div id="game-over-stats" class="game-over__stats"></div>
+        <div id="game-over-rewards" class="game-over__rewards"></div>
         <button id="restart-button" class="button" type="button">Play Again</button>
       </div>
     `;
@@ -192,6 +201,7 @@ export class GameScene extends Phaser.Scene {
     this.hud = {
       root: hud,
       title,
+      titleProfile: title.querySelector<HTMLDivElement>('#title-profile')!,
       gameOver,
       pause,
       debug: hud.querySelector<HTMLDivElement>('#debug-panel')!,
@@ -204,8 +214,10 @@ export class GameScene extends Phaser.Scene {
       dawnFill: hud.querySelector<HTMLDivElement>('#dawn-fill')!,
       gameOverTitle: gameOver.querySelector<HTMLHeadingElement>('#game-over-title')!,
       gameOverMessage: gameOver.querySelector<HTMLParagraphElement>('#game-over-message')!,
-      gameOverStats: gameOver.querySelector<HTMLDivElement>('#game-over-stats')!
+      gameOverStats: gameOver.querySelector<HTMLDivElement>('#game-over-stats')!,
+      gameOverRewards: gameOver.querySelector<HTMLDivElement>('#game-over-rewards')!
     };
+    this.renderProfileCard();
   }
 
   private createRenderLayers(): void {
@@ -252,12 +264,45 @@ export class GameScene extends Phaser.Scene {
     this.hud.gameOver.classList.add('is-hidden');
     this.isStarted = true;
     this.isPaused = false;
+    this.rewardsApplied = false;
+    this.lastRewards = null;
     this.lastCountdownSecond = 0;
     this.lastExposedPulseMs = 0;
     this.hudNotice = null;
     this.hud.notice.classList.add('is-hidden');
     void this.audio.unlock();
     this.configureCamera();
+  }
+
+  private renderProfileCard(): void {
+    const progress = xpProgressInLevel(this.profile.xp, this.profile.level);
+    this.hud.titleProfile.innerHTML = `
+      <div class="profile-card__row">
+        <span>${this.profile.title}</span>
+        <span>LVL ${this.profile.level}</span>
+      </div>
+      <div class="profile-card__xp"><div style="width: ${progress.percent}%"></div></div>
+      <div class="profile-card__row profile-card__muted">
+        <span>${progress.current}/${progress.needed} XP</span>
+        <span>${this.profile.embers} EMBERS</span>
+      </div>
+      <div class="profile-card__row profile-card__muted">
+        <span>${this.profile.matchesPlayed} MATCHES</span>
+        <span>${this.profile.wins} WINS</span>
+      </div>
+      <div class="profile-card__row profile-card__muted">
+        <span>STREAK ${this.profile.streak}D</span>
+        <span>${this.profile.bestKills} BEST KILLS</span>
+      </div>
+      <div class="profile-card__contracts">
+        ${this.profile.contracts.map((contract) => `
+          <div class="profile-card__contract ${contract.claimed ? 'is-claimed' : ''}">
+            <span>${contract.label}</span>
+            <span>${contract.progress}/${contract.target}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   private updatePauseToggle(): void {
@@ -758,6 +803,15 @@ export class GameScene extends Phaser.Scene {
   private showGameOver(): void {
     if (!this.hud.gameOver.classList.contains('is-hidden')) return;
 
+    if (!this.rewardsApplied) {
+      const result = applyMatchRewards(this.profile, this.simulation.stats, this.simulation.outcome);
+      this.profile = result.profile;
+      this.lastRewards = result.rewards;
+      this.rewardsApplied = true;
+      saveProfile(this.profile);
+      this.renderProfileCard();
+    }
+
     const won = this.simulation.outcome === 'won';
     const accuracy = this.simulation.stats.playerShots > 0 ? Math.round((this.simulation.stats.playerHits / this.simulation.stats.playerShots) * 100) : 0;
     this.hud.gameOverTitle.textContent = won ? 'LAST SHADOW STANDING' : 'YOUR SHADOW FADES';
@@ -769,6 +823,15 @@ export class GameScene extends Phaser.Scene {
       `Shots ${this.simulation.stats.playerShots}`,
       `Accuracy ${accuracy}%`
     ].join('<br>');
+    this.hud.gameOverRewards.innerHTML = this.lastRewards
+      ? [
+          this.lastRewards.leveledUp ? `Level Up ${this.lastRewards.previousLevel} -> ${this.lastRewards.newLevel}` : `Level ${this.profile.level}`,
+          `+${this.lastRewards.xp} XP`,
+          `+${this.lastRewards.embers} Embers`,
+          this.lastRewards.completedContracts.length > 0 ? `${this.lastRewards.completedContracts.length} Contract Complete` : '',
+          ...this.lastRewards.reasons.slice(0, 3)
+        ].filter(Boolean).join('<br>')
+      : '';
     this.hud.gameOver.classList.remove('is-hidden');
   }
 

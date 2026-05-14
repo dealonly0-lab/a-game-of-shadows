@@ -95,4 +95,7 @@ Progress:
 - Match stats added for player shots, hits, kills, and survival time.
 - Pause menu added with resume and restart.
 - Combat notices added for kills.
+- Local progression profile added with XP, levels, Embers, wins, match count, best kills, and best survival.
+- Match rewards are granted after game over and persisted in localStorage.
+- Daily contracts added with auto-claimed XP/Ember rewards and streak bonuses.
 - Build passes after these changes.

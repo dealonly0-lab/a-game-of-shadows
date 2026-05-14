@@ -255,6 +255,8 @@ Prepare for retention and future business features without ruining the prototype
 Tasks:
 
 - Add player profiles.
+- Add local XP, level, and match reward progression.
+- Add daily contracts and streak bonuses to give each session clear goals.
 - Add cosmetic shadow skins.
 - Add unlockable cosmetics.
 - Add match stats.
