@@ -27,6 +27,8 @@ type HudRefs = {
   title: HTMLDivElement;
   titleProfile: HTMLDivElement;
   titleMap: HTMLDivElement;
+  titleLevel: HTMLElement;
+  titleThreat: HTMLElement;
   gameOver: HTMLDivElement;
   pause: HTMLDivElement;
   debug: HTMLDivElement;
@@ -150,16 +152,28 @@ export class GameScene extends Phaser.Scene {
     title.className = 'title';
     title.innerHTML = `
       <div class="home-shell">
+        <div class="home-topbar">
+          <span class="home-brand">HOLLOW</span>
+          <span>Top-down shadow survival</span>
+          <span id="home-level">LVL ${this.profile.level}</span>
+        </div>
         <section class="home-hero">
-          <div class="title__eyebrow">A Game of Shadows</div>
-          <h1 class="title__name">HOLLOW</h1>
-          <div class="title__tagline">"Don't step in the light."</div>
-          <button id="start-button" class="button button--play" type="button">Hunt Now</button>
+          <div class="home-mode">
+            <div class="title__eyebrow">Featured Hunt</div>
+            <h1 class="title__name">HOLLOW</h1>
+            <div class="title__tagline">"Don't step in the light."</div>
+            <div class="home-mode__stats">
+              <span>${this.simulation.variant.layout.name}</span>
+              <span id="home-threat">${this.simulation.variant.threatLabel}</span>
+              <span>${this.simulation.variant.botCount} Hunters</span>
+            </div>
+            <button id="start-button" class="button button--play" type="button">Hunt Now</button>
+          </div>
         </section>
         <aside class="home-panel">
           <div class="home-panel__header">
             <span>Shadow Rank</span>
-            <strong id="home-level">LVL ${this.profile.level}</strong>
+            <strong>${this.profile.title}</strong>
           </div>
           <div id="title-profile" class="profile-card"></div>
         </aside>
@@ -181,7 +195,10 @@ export class GameScene extends Phaser.Scene {
         <p id="game-over-message" class="game-over__message">The light found you.</p>
         <div id="game-over-stats" class="game-over__stats"></div>
         <div id="game-over-rewards" class="game-over__rewards"></div>
-        <button id="restart-button" class="button" type="button">Play Again</button>
+        <div class="game-over__actions">
+          <button id="restart-button" class="button" type="button">Play Again</button>
+          <button id="home-button" class="button button--secondary" type="button">Home</button>
+        </div>
       </div>
     `;
 
@@ -206,6 +223,9 @@ export class GameScene extends Phaser.Scene {
     gameOver.querySelector<HTMLButtonElement>('#restart-button')?.addEventListener('click', () => {
       this.restartRound();
     });
+    gameOver.querySelector<HTMLButtonElement>('#home-button')?.addEventListener('click', () => {
+      this.returnHome();
+    });
     pause.querySelector<HTMLButtonElement>('#resume-button')?.addEventListener('click', () => {
       this.setPaused(false);
     });
@@ -219,6 +239,8 @@ export class GameScene extends Phaser.Scene {
       title,
       titleProfile: title.querySelector<HTMLDivElement>('#title-profile')!,
       titleMap: title.querySelector<HTMLDivElement>('#title-map')!,
+      titleLevel: title.querySelector<HTMLElement>('#home-level')!,
+      titleThreat: title.querySelector<HTMLElement>('#home-threat')!,
       gameOver,
       pause,
       debug: hud.querySelector<HTMLDivElement>('#debug-panel')!,
@@ -295,6 +317,27 @@ export class GameScene extends Phaser.Scene {
     this.configureCamera();
   }
 
+  private returnHome(): void {
+    this.profile = loadProfile();
+    this.simulation = this.createSimulation();
+    this.raycaster = this.createRaycaster();
+    this.hud.gameOver.classList.add('is-hidden');
+    this.hud.pause.classList.add('is-hidden');
+    this.hud.title.classList.remove('is-hidden');
+    this.isStarted = false;
+    this.isPaused = false;
+    this.rewardsApplied = false;
+    this.lastRewards = null;
+    this.lastCountdownSecond = 0;
+    this.lastExposedPulseMs = 0;
+    this.hudNotice = null;
+    this.hud.notice.classList.add('is-hidden');
+    this.drawMap();
+    this.configureCamera();
+    this.renderProfileCard();
+    this.renderHomeMapCard();
+  }
+
   private createSimulation(): GameSimulation {
     return new GameSimulation({
       playerLevel: this.profile.level,
@@ -309,6 +352,7 @@ export class GameScene extends Phaser.Scene {
 
   private renderProfileCard(): void {
     const progress = xpProgressInLevel(this.profile.xp, this.profile.level);
+    this.hud.titleLevel.textContent = `LVL ${this.profile.level}`;
     this.hud.titleProfile.innerHTML = `
       <div class="profile-card__row">
         <span>${this.profile.title}</span>
@@ -341,6 +385,7 @@ export class GameScene extends Phaser.Scene {
   private renderHomeMapCard(): void {
     const variant = this.simulation.variant;
     const layout = variant.layout;
+    this.hud.titleThreat.textContent = variant.threatLabel;
     this.hud.titleMap.innerHTML = `
       <div class="map-card__name">${layout.name}</div>
       <div class="map-card__meta">${layout.cols}x${layout.rows} tiles - ${variant.name}</div>

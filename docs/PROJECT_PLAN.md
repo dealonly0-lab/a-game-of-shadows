@@ -271,6 +271,7 @@ Tasks:
 - Add leaderboard stub.
 - Add local inventory model before payments.
 - Upgrade the title screen into a home hub with play, profile, daily goals, and next-match info.
+- Add home navigation after match end so players can inspect progress before starting another hunt.
 
 Exit check:
 

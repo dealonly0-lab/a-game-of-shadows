@@ -103,4 +103,6 @@ Progress:
 - Map system now supports multiple layouts; `Grave Market` adds a larger 84x48 arena.
 - Camera, minimap, raycasting, collision, spawns, and lights now read from the selected match layout.
 - Title screen upgraded into a home hub with Play, profile progression, daily contracts, and next-hunt map/threat info.
+- Home hub visual hierarchy improved with topbar, featured hunt panel, stronger CTA, and cleaner information cards.
+- Game-over screen now supports returning to the home hub instead of forcing immediate replay.
 - Build passes after these changes.
