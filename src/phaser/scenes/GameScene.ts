@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { BEAM_COOLDOWN_MS, PLAYER_RADIUS } from '../../game/simulation/constants';
 import { GameSimulation } from '../../game/simulation/GameSimulation';
-import { MAP_DATA, MAP_HEIGHT, MAP_WIDTH, MAP_COLS, MAP_ROWS, TILE_SIZE, TileKind } from '../../game/content/villageMap';
+import { TILE_SIZE, TileKind } from '../../game/content/villageMap';
 import { buildWallSegments, Raycaster } from '../../game/simulation/raycast';
 import type { Entity, InputActionState, LightSource } from '../../game/simulation/types';
 import { applyMatchRewards, loadProfile, saveProfile, type MatchRewards, type PlayerProfile, xpProgressInLevel } from '../../game/progression/profile';
@@ -26,6 +26,7 @@ type HudRefs = {
   root: HTMLDivElement;
   title: HTMLDivElement;
   titleProfile: HTMLDivElement;
+  titleMap: HTMLDivElement;
   gameOver: HTMLDivElement;
   pause: HTMLDivElement;
   debug: HTMLDivElement;
@@ -148,12 +149,27 @@ export class GameScene extends Phaser.Scene {
     const title = document.createElement('div');
     title.className = 'title';
     title.innerHTML = `
-      <div class="title__inner">
-        <div class="title__eyebrow">A Game of Shadows</div>
-        <h1 class="title__name">HOLLOW</h1>
-        <div class="title__tagline">"Don't step in the light."</div>
-        <div id="title-profile" class="profile-card"></div>
-        <button id="start-button" class="button" type="button">Enter the Village</button>
+      <div class="home-shell">
+        <section class="home-hero">
+          <div class="title__eyebrow">A Game of Shadows</div>
+          <h1 class="title__name">HOLLOW</h1>
+          <div class="title__tagline">"Don't step in the light."</div>
+          <button id="start-button" class="button button--play" type="button">Hunt Now</button>
+        </section>
+        <aside class="home-panel">
+          <div class="home-panel__header">
+            <span>Shadow Rank</span>
+            <strong id="home-level">LVL ${this.profile.level}</strong>
+          </div>
+          <div id="title-profile" class="profile-card"></div>
+        </aside>
+        <aside class="home-panel home-panel--map">
+          <div class="home-panel__header">
+            <span>Next Hunt</span>
+            <strong>${this.simulation.variant.threatLabel}</strong>
+          </div>
+          <div id="title-map" class="map-card"></div>
+        </aside>
       </div>
     `;
 
@@ -202,6 +218,7 @@ export class GameScene extends Phaser.Scene {
       root: hud,
       title,
       titleProfile: title.querySelector<HTMLDivElement>('#title-profile')!,
+      titleMap: title.querySelector<HTMLDivElement>('#title-map')!,
       gameOver,
       pause,
       debug: hud.querySelector<HTMLDivElement>('#debug-panel')!,
@@ -218,6 +235,7 @@ export class GameScene extends Phaser.Scene {
       gameOverRewards: gameOver.querySelector<HTMLDivElement>('#game-over-rewards')!
     };
     this.renderProfileCard();
+    this.renderHomeMapCard();
   }
 
   private createRenderLayers(): void {
@@ -255,7 +273,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private configureCamera(): void {
-    this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
+    const layout = this.simulation.variant.layout;
+    this.cameras.main.setBounds(0, 0, layout.width, layout.height);
     this.cameras.main.centerOn(this.simulation.player.x, this.simulation.player.y);
   }
 
@@ -284,7 +303,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createRaycaster(): Raycaster {
-    return new Raycaster(buildWallSegments((col, row) => this.simulation.isBlockedTile(col, row), MAP_COLS, MAP_ROWS, TILE_SIZE));
+    const layout = this.simulation.variant.layout;
+    return new Raycaster(buildWallSegments((col, row) => this.simulation.isBlockedTile(col, row), layout.cols, layout.rows, layout.tileSize));
   }
 
   private renderProfileCard(): void {
@@ -314,6 +334,21 @@ export class GameScene extends Phaser.Scene {
             <span>${contract.progress}/${contract.target}</span>
           </div>
         `).join('')}
+      </div>
+    `;
+  }
+
+  private renderHomeMapCard(): void {
+    const variant = this.simulation.variant;
+    const layout = variant.layout;
+    this.hud.titleMap.innerHTML = `
+      <div class="map-card__name">${layout.name}</div>
+      <div class="map-card__meta">${layout.cols}x${layout.rows} tiles - ${variant.name}</div>
+      <div class="map-card__grid">
+        <span>Threat</span><strong>${variant.threatLabel}</strong>
+        <span>Sealed Paths</span><strong>${variant.sealedTiles.length}</strong>
+        <span>Hunters</span><strong>${variant.botCount}</strong>
+        <span>Dawn</span><strong>${Math.round(variant.dawnDurationMs / 1000)}s</strong>
       </div>
     `;
   }
@@ -359,17 +394,19 @@ export class GameScene extends Phaser.Scene {
 
   private updateCamera(dt: number): void {
     const camera = this.cameras.main;
-    const targetX = Phaser.Math.Clamp(this.simulation.player.x - camera.width / 2, 0, Math.max(0, MAP_WIDTH - camera.width));
-    const targetY = Phaser.Math.Clamp(this.simulation.player.y - camera.height / 2, 0, Math.max(0, MAP_HEIGHT - camera.height));
+    const layout = this.simulation.variant.layout;
+    const targetX = Phaser.Math.Clamp(this.simulation.player.x - camera.width / 2, 0, Math.max(0, layout.width - camera.width));
+    const targetY = Phaser.Math.Clamp(this.simulation.player.y - camera.height / 2, 0, Math.max(0, layout.height - camera.height));
     const lerp = Math.min(1, dt * 7);
     camera.setScroll(camera.scrollX + (targetX - camera.scrollX) * lerp, camera.scrollY + (targetY - camera.scrollY) * lerp);
   }
 
   private drawMap(): void {
     const g = this.worldLayer.clear();
-    for (let row = 0; row < MAP_ROWS; row += 1) {
-      for (let col = 0; col < MAP_COLS; col += 1) {
-        this.drawTile(g, col, row, MAP_DATA[row][col]);
+    const layout = this.simulation.variant.layout;
+    for (let row = 0; row < layout.rows; row += 1) {
+      for (let col = 0; col < layout.cols; col += 1) {
+        this.drawTile(g, col, row, layout.data[row][col]);
       }
     }
 
@@ -663,8 +700,9 @@ export class GameScene extends Phaser.Scene {
     const g = this.debugLayer.clear();
     if (!this.debugEnabled) return;
 
-    for (let row = 0; row < MAP_ROWS; row += 1) {
-      for (let col = 0; col < MAP_COLS; col += 1) {
+    const layout = this.simulation.variant.layout;
+    for (let row = 0; row < layout.rows; row += 1) {
+      for (let col = 0; col < layout.cols; col += 1) {
         if (!this.simulation.isBlockedTile(col, row)) continue;
         g.lineStyle(1, 0x44ff88, 0.26);
         g.strokeRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
@@ -690,21 +728,22 @@ export class GameScene extends Phaser.Scene {
 
   private renderMinimap(): void {
     const g = this.minimapLayer.clear();
+    const layout = this.simulation.variant.layout;
     const width = 184;
-    const height = Math.round(width * (MAP_HEIGHT / MAP_WIDTH));
+    const height = Math.round(width * (layout.height / layout.width));
     const x = this.scale.width - width - 24;
     const y = this.scale.height - height - 24;
-    const sx = width / MAP_WIDTH;
-    const sy = height / MAP_HEIGHT;
+    const sx = width / layout.width;
+    const sy = height / layout.height;
 
     g.fillStyle(0x020008, 0.72);
     g.fillRect(x, y, width, height);
     g.lineStyle(1, 0xd4a843, 0.34);
     g.strokeRect(x, y, width, height);
 
-    for (let row = 0; row < MAP_ROWS; row += 1) {
-      for (let col = 0; col < MAP_COLS; col += 1) {
-        const tile = MAP_DATA[row][col];
+    for (let row = 0; row < layout.rows; row += 1) {
+      for (let col = 0; col < layout.cols; col += 1) {
+        const tile = layout.data[row][col];
         if (this.simulation.isBlockedTile(col, row)) {
           g.fillStyle(0x433052, 0.82);
         } else if (tile === TileKind.Grave || tile === TileKind.Tree) {

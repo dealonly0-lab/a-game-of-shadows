@@ -85,6 +85,7 @@ Main file:
 Owns:
 
 - haunted village tile map
+- multiple map layouts, including larger arenas
 - wall/floor/grave/tree tile definitions
 - light source positions
 - bot spawn positions
@@ -198,6 +199,7 @@ Tasks:
 - Add line-of-sight checks for bot target selection.
 - Add map hazards and risky shortcuts.
 - Add match director so each round changes spawns, blocked paths, lighting, bot pressure, and dawn speed.
+- Add larger map layouts and route the camera, raycaster, minimap, and collision through the selected layout.
 - Add clearer feedback when the player is exposed.
 
 Exit check:
@@ -268,6 +270,7 @@ Tasks:
 - Add pause and resume flow.
 - Add leaderboard stub.
 - Add local inventory model before payments.
+- Upgrade the title screen into a home hub with play, profile, daily goals, and next-match info.
 
 Exit check:
 

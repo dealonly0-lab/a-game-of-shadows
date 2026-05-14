@@ -17,7 +17,7 @@ import {
   PLAYER_SPEED
 } from './constants';
 import type { BotEntity, Entity, GameplayEvent, GameOutcome, InputActionState, LightSource, MatchPhase, MatchStats, Particle, Projectile } from './types';
-import { MAP_COLS, MAP_ROWS, TILE_SIZE, isWallTile } from '../content/villageMap';
+import { TILE_SIZE, isWallInLayout } from '../content/villageMap';
 import { createMatchVariant, type MatchVariant } from '../content/matchDirector';
 
 type SimulationInput = {
@@ -138,11 +138,11 @@ export class GameSimulation {
   }
 
   isBlockedTile(col: number, row: number): boolean {
-    return isWallTile(col, row) || this.sealedTileKeys.has(tileKey(col, row));
+    return isWallInLayout(this.variant.layout, col, row) || this.sealedTileKeys.has(tileKey(col, row));
   }
 
   isBlocked(x: number, y: number): boolean {
-    if (x < 0 || y < 0 || x >= MAP_COLS * TILE_SIZE || y >= MAP_ROWS * TILE_SIZE) return true;
+    if (x < 0 || y < 0 || x >= this.variant.layout.width || y >= this.variant.layout.height) return true;
     return this.isBlockedTile(Math.floor(x / TILE_SIZE), Math.floor(y / TILE_SIZE));
   }
 

@@ -1,4 +1,4 @@
-import { BOT_SPAWNS, LIGHT_DEFS, PLAYER_SPAWN } from './villageMap';
+import { MAP_LAYOUTS, type MapLayout } from './villageMap';
 
 export type SpawnDef = {
   col: number;
@@ -17,6 +17,7 @@ export type MatchVariant = {
   name: string;
   threatLabel: string;
   difficulty: number;
+  layout: MapLayout;
   dawnDurationMs: number;
   botCount: number;
   botSpeedMultiplier: number;
@@ -34,17 +35,6 @@ type DirectorInput = {
   matchesPlayed: number;
 };
 
-const PLAYER_SPAWNS: SpawnDef[] = [
-  PLAYER_SPAWN,
-  { col: 8, row: 27 },
-  { col: 14, row: 18 },
-  { col: 25, row: 30 },
-  { col: 42, row: 28 },
-  { col: 55, row: 18 },
-  { col: 50, row: 8 },
-  { col: 18, row: 9 }
-];
-
 const EXTRA_BOT_SPAWNS: SpawnDef[] = [
   { col: 8, row: 10 },
   { col: 14, row: 28 },
@@ -53,21 +43,6 @@ const EXTRA_BOT_SPAWNS: SpawnDef[] = [
   { col: 50, row: 18 },
   { col: 58, row: 27 },
   { col: 43, row: 9 }
-];
-
-const SEALED_TILE_CANDIDATES: SpawnDef[] = [
-  { col: 10, row: 15 },
-  { col: 10, row: 22 },
-  { col: 17, row: 18 },
-  { col: 25, row: 10 },
-  { col: 35, row: 14 },
-  { col: 35, row: 22 },
-  { col: 45, row: 18 },
-  { col: 54, row: 12 },
-  { col: 54, row: 24 },
-  { col: 27, row: 29 },
-  { col: 43, row: 29 },
-  { col: 58, row: 10 }
 ];
 
 const VARIANT_NAMES = [
@@ -85,17 +60,18 @@ export function createMatchVariant(input: DirectorInput): MatchVariant {
   const difficulty = Math.min(8, 1 + Math.floor(input.matchesPlayed / 4) + Math.floor(input.playerLevel / 5));
   const name = pick(VARIANT_NAMES, rng);
   const pressure = difficulty - 1;
+  const layout = chooseLayout(input.matchesPlayed, rng);
 
-  const playerSpawn = pickUnique(PLAYER_SPAWNS, 1, rng)[0];
-  const botSpawns = shuffle([...BOT_SPAWNS, ...EXTRA_BOT_SPAWNS], rng).filter((spawn) => distanceTiles(spawn, playerSpawn) > 9);
+  const playerSpawn = pickUnique(layout.playerSpawns, 1, rng)[0];
+  const botSpawns = shuffle([...layout.botSpawns, ...EXTRA_BOT_SPAWNS], rng).filter((spawn) => isInLayout(spawn, layout) && distanceTiles(spawn, playerSpawn) > 9);
   const sealedCount = Math.min(8, 2 + Math.floor(difficulty / 2));
   const sealedTiles = pickUnique(
-    SEALED_TILE_CANDIDATES.filter((tile) => distanceTiles(tile, playerSpawn) > 5),
+    layout.sealCandidates.filter((tile) => distanceTiles(tile, playerSpawn) > 5),
     sealedCount,
     rng
   );
 
-  const lights = LIGHT_DEFS.map((light, index) => {
+  const lights = layout.lightDefs.map((light, index) => {
     const dimChance = light.kind === 'lantern' ? 0.22 + difficulty * 0.025 : 0.08;
     const radiusMultiplier = rng() < dimChance ? 0.72 : 0.92 + rng() * 0.22;
     return {
@@ -111,6 +87,7 @@ export function createMatchVariant(input: DirectorInput): MatchVariant {
     name,
     threatLabel: threatLabel(difficulty),
     difficulty,
+    layout,
     dawnDurationMs: Math.max(42_000, 72_000 - pressure * 4_000),
     botCount: Math.min(10, 7 + Math.floor(difficulty / 3)),
     botSpeedMultiplier: 1 + pressure * 0.035,
@@ -122,6 +99,11 @@ export function createMatchVariant(input: DirectorInput): MatchVariant {
     lights,
     sealedTiles
   };
+}
+
+function chooseLayout(matchesPlayed: number, rng: () => number): MapLayout {
+  if (matchesPlayed < 2) return MAP_LAYOUTS[0];
+  return rng() < 0.48 ? MAP_LAYOUTS[1] : MAP_LAYOUTS[0];
 }
 
 function createSeed(input: DirectorInput): number {
@@ -155,6 +137,10 @@ function shuffle<T>(items: T[], rng: () => number): T[] {
 
 function distanceTiles(a: SpawnDef, b: SpawnDef): number {
   return Math.hypot(a.col - b.col, a.row - b.row);
+}
+
+function isInLayout(spawn: SpawnDef, layout: MapLayout): boolean {
+  return spawn.col > 0 && spawn.row > 0 && spawn.col < layout.cols - 1 && spawn.row < layout.rows - 1;
 }
 
 function mulberry32(seed: number): () => number {

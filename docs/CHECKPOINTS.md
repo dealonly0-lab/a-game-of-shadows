@@ -100,4 +100,7 @@ Progress:
 - Daily contracts added with auto-claimed XP/Ember rewards and streak bonuses.
 - Match director added so each round can use different player spawns, bot spawns, light tuning, sealed map tiles, bot pressure, and dawn speed.
 - Dynamic sealed tiles are real collision and raycast blockers, not only visuals.
+- Map system now supports multiple layouts; `Grave Market` adds a larger 84x48 arena.
+- Camera, minimap, raycasting, collision, spawns, and lights now read from the selected match layout.
+- Title screen upgraded into a home hub with Play, profile progression, daily contracts, and next-hunt map/threat info.
 - Build passes after these changes.
