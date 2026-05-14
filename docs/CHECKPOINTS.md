@@ -98,4 +98,6 @@ Progress:
 - Local progression profile added with XP, levels, Embers, wins, match count, best kills, and best survival.
 - Match rewards are granted after game over and persisted in localStorage.
 - Daily contracts added with auto-claimed XP/Ember rewards and streak bonuses.
+- Match director added so each round can use different player spawns, bot spawns, light tuning, sealed map tiles, bot pressure, and dawn speed.
+- Dynamic sealed tiles are real collision and raycast blockers, not only visuals.
 - Build passes after these changes.

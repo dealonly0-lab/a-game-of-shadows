@@ -9,7 +9,6 @@ import {
   BEAM_COOLDOWN_MS,
   BEAM_RANGE,
   BEAM_SPEED,
-  DAWN_DURATION_MS,
   EXPOSURE_DECAY_PER_SECOND,
   EXPOSURE_GAIN_PER_SECOND,
   MATCH_COUNTDOWN_MS,
@@ -18,9 +17,16 @@ import {
   PLAYER_SPEED
 } from './constants';
 import type { BotEntity, Entity, GameplayEvent, GameOutcome, InputActionState, LightSource, MatchPhase, MatchStats, Particle, Projectile } from './types';
-import { BOT_SPAWNS, LIGHT_DEFS, MAP_COLS, MAP_ROWS, PLAYER_SPAWN, TILE_SIZE, isWallTile } from '../content/villageMap';
+import { MAP_COLS, MAP_ROWS, TILE_SIZE, isWallTile } from '../content/villageMap';
+import { createMatchVariant, type MatchVariant } from '../content/matchDirector';
+
+type SimulationInput = {
+  playerLevel: number;
+  matchesPlayed: number;
+};
 
 export class GameSimulation {
+  readonly variant: MatchVariant;
   readonly player: Entity;
   readonly bots: BotEntity[];
   readonly lights: LightSource[];
@@ -48,9 +54,13 @@ export class GameSimulation {
   muzzleY = 0;
 
   private projectileId = 0;
+  private readonly sealedTileKeys: Set<string>;
 
-  constructor() {
-    const playerSpawn = resolveSpawnPoint(PLAYER_SPAWN.col, PLAYER_SPAWN.row);
+  constructor(input: SimulationInput = { playerLevel: 1, matchesPlayed: 0 }) {
+    this.variant = createMatchVariant(input);
+    this.sealedTileKeys = new Set(this.variant.sealedTiles.map((tile) => tileKey(tile.col, tile.row)));
+
+    const playerSpawn = resolveSpawnPoint(this.variant.playerSpawn.col, this.variant.playerSpawn.row, (x, y) => this.canMove(x, y, PLAYER_RADIUS));
     this.player = {
       id: 'player',
       x: playerSpawn.x,
@@ -62,15 +72,15 @@ export class GameSimulation {
       shadow: null
     };
 
-    this.bots = BOT_SPAWNS.slice(0, BOT_COUNT).map((spawn, index) => ({
-      ...createBot(index, spawn.col, spawn.row)
+    this.bots = this.variant.botSpawns.slice(0, Math.min(BOT_COUNT + 3, this.variant.botCount)).map((spawn, index) => ({
+      ...createBot(index, spawn.col, spawn.row, (x, y) => this.canMove(x, y, PLAYER_RADIUS))
     }));
 
-    this.lights = LIGHT_DEFS.map((light, index) => ({
+    this.lights = this.variant.lights.map((light, index) => ({
       id: `light-${index}`,
       x: light.col * TILE_SIZE,
       y: light.row * TILE_SIZE,
-      baseRadius: light.radius,
+      baseRadius: light.radius * this.variant.lightRadiusMultiplier,
       radius: light.radius,
       kind: light.kind,
       flickerSeed: index * 0.73
@@ -127,6 +137,15 @@ export class GameSimulation {
     return this.playerSpawnGraceMs > 0 || this.matchPhase !== 'active';
   }
 
+  isBlockedTile(col: number, row: number): boolean {
+    return isWallTile(col, row) || this.sealedTileKeys.has(tileKey(col, row));
+  }
+
+  isBlocked(x: number, y: number): boolean {
+    if (x < 0 || y < 0 || x >= MAP_COLS * TILE_SIZE || y >= MAP_ROWS * TILE_SIZE) return true;
+    return this.isBlockedTile(Math.floor(x / TILE_SIZE), Math.floor(y / TILE_SIZE));
+  }
+
   private updateCountdown(deltaMs: number): void {
     if (this.matchPhase !== 'countdown') return;
     this.countdownMs = Math.max(0, this.countdownMs - deltaMs);
@@ -141,7 +160,7 @@ export class GameSimulation {
           ? Math.sin(t * 0.07 + light.flickerSeed) * 16 + Math.sin(t * 0.13 + light.flickerSeed * 2) * 9
           : Math.sin(t * 0.04 + light.flickerSeed) * 5;
 
-      light.radius = light.baseRadius + flicker + this.dawnProgress * 220;
+      light.radius = light.baseRadius + flicker + this.dawnProgress * (220 + this.variant.difficulty * 10);
     }
   }
 
@@ -164,7 +183,7 @@ export class GameSimulation {
       if (bot.wanderMs > 0) bot.wanderMs -= deltaMs;
       if (bot.memoryMs > 0) bot.memoryMs = Math.max(0, bot.memoryMs - deltaMs);
 
-      const target = this.findNearestShadowedTarget(bot, BOT_TARGET_RANGE);
+      const target = this.findNearestShadowedTarget(bot, BOT_TARGET_RANGE * this.variant.botRangeMultiplier);
       if (target) {
         bot.aiState = 'hunt';
         bot.wanderAngle = Math.atan2(target.y - bot.y, target.x - bot.x);
@@ -174,9 +193,9 @@ export class GameSimulation {
         bot.memoryMs = BOT_MEMORY_MS;
 
         const distance = distanceBetween(bot, target);
-        if (distance < BOT_FIRE_RANGE && bot.cooldownMs <= 0 && bot.shadow) {
+        if (distance < BOT_FIRE_RANGE * this.variant.botRangeMultiplier && bot.cooldownMs <= 0 && bot.shadow) {
           this.fire(bot);
-          bot.cooldownMs = BEAM_COOLDOWN_MS + Math.random() * 1000;
+          bot.cooldownMs = (BEAM_COOLDOWN_MS + Math.random() * 1000) * this.variant.botCooldownMultiplier;
         }
       } else if (bot.memoryMs > 0) {
         bot.aiState = 'investigate';
@@ -196,7 +215,8 @@ export class GameSimulation {
         bot.aiState = 'wander';
       }
 
-      const speed = bot.aiState === 'hunt' ? BOT_HUNT_SPEED : bot.aiState === 'investigate' ? BOT_INVESTIGATE_SPEED : BOT_WANDER_SPEED;
+      const baseSpeed = bot.aiState === 'hunt' ? BOT_HUNT_SPEED : bot.aiState === 'investigate' ? BOT_INVESTIGATE_SPEED : BOT_WANDER_SPEED;
+      const speed = baseSpeed * this.variant.botSpeedMultiplier;
       const dx = Math.cos(bot.wanderAngle) * speed * dt;
       const dy = Math.sin(bot.wanderAngle) * speed * dt;
       const movedX = this.moveEntityAxis(bot, dx, 0);
@@ -260,7 +280,7 @@ export class GameSimulation {
       projectile.y += projectile.vy * dt;
       projectile.traveled += BEAM_SPEED * dt;
 
-      if (projectile.traveled > BEAM_RANGE || isBlocked(projectile.x, projectile.y)) {
+      if (projectile.traveled > BEAM_RANGE || this.isBlocked(projectile.x, projectile.y)) {
         this.spawnParticles(projectile.x, projectile.y, false);
         this.events.push({ type: 'beam-impact', x: projectile.x, y: projectile.y });
         this.projectiles.splice(index, 1);
@@ -299,8 +319,8 @@ export class GameSimulation {
   }
 
   private updateDawn(deltaMs: number): void {
-    this.dawnMs = Math.min(DAWN_DURATION_MS, this.dawnMs + deltaMs);
-    this.dawnProgress = this.dawnMs / DAWN_DURATION_MS;
+    this.dawnMs = Math.min(this.variant.dawnDurationMs, this.dawnMs + deltaMs);
+    this.dawnProgress = this.dawnMs / this.variant.dawnDurationMs;
   }
 
   private updateOutcome(): void {
@@ -364,7 +384,7 @@ export class GameSimulation {
     for (const entity of this.entities()) {
       if (!entity.alive || entity.id === bot.id || !entity.shadow) continue;
       const distance = distanceBetween(bot, entity);
-      if (distance < maxDistance && distance < closestDistance && hasLineOfSight(bot.x, bot.y, entity.x, entity.y)) {
+      if (distance < maxDistance && distance < closestDistance && hasLineOfSight(bot.x, bot.y, entity.x, entity.y, (x, y) => this.isBlocked(x, y))) {
         closest = entity;
         closestDistance = distance;
       }
@@ -381,7 +401,7 @@ export class GameSimulation {
   private moveEntityAxis(entity: Entity, dx: number, dy: number): boolean {
     const nx = entity.x + dx;
     const ny = entity.y + dy;
-    if (!canMove(nx, ny, PLAYER_RADIUS)) return false;
+    if (!this.canMove(nx, ny, PLAYER_RADIUS)) return false;
     entity.x = nx;
     entity.y = ny;
     return true;
@@ -389,6 +409,21 @@ export class GameSimulation {
 
   private entities(): Entity[] {
     return [this.player, ...this.bots];
+  }
+
+  private canMove(x: number, y: number, radius: number): boolean {
+    const points = [
+      [x - radius, y - radius],
+      [x + radius, y - radius],
+      [x - radius, y + radius],
+      [x + radius, y + radius],
+      [x, y - radius],
+      [x, y + radius],
+      [x - radius, y],
+      [x + radius, y]
+    ];
+
+    return points.every(([px, py]) => !this.isBlocked(px, py));
   }
 }
 
@@ -402,23 +437,8 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-function canMove(x: number, y: number, radius: number): boolean {
-  const points = [
-    [x - radius, y - radius],
-    [x + radius, y - radius],
-    [x - radius, y + radius],
-    [x + radius, y + radius],
-    [x, y - radius],
-    [x, y + radius],
-    [x - radius, y],
-    [x + radius, y]
-  ];
-
-  return points.every(([px, py]) => !isBlocked(px, py));
-}
-
-function createBot(index: number, col: number, row: number): BotEntity {
-  const spawn = resolveSpawnPoint(col, row);
+function createBot(index: number, col: number, row: number, canMoveTo: (x: number, y: number) => boolean): BotEntity {
+  const spawn = resolveSpawnPoint(col, row, canMoveTo);
   return {
     id: `bot-${index}`,
     x: spawn.x,
@@ -437,10 +457,10 @@ function createBot(index: number, col: number, row: number): BotEntity {
   };
 }
 
-function resolveSpawnPoint(col: number, row: number): { x: number; y: number } {
+function resolveSpawnPoint(col: number, row: number, canMoveTo: (x: number, y: number) => boolean): { x: number; y: number } {
   const preferredX = (col + 0.5) * TILE_SIZE;
   const preferredY = (row + 0.5) * TILE_SIZE;
-  if (canMove(preferredX, preferredY, PLAYER_RADIUS)) return { x: preferredX, y: preferredY };
+  if (canMoveTo(preferredX, preferredY)) return { x: preferredX, y: preferredY };
 
   for (let radius = 1; radius <= 8; radius += 1) {
     for (let y = row - radius; y <= row + radius; y += 1) {
@@ -448,7 +468,7 @@ function resolveSpawnPoint(col: number, row: number): { x: number; y: number } {
         if (Math.abs(x - col) !== radius && Math.abs(y - row) !== radius) continue;
         const worldX = (x + 0.5) * TILE_SIZE;
         const worldY = (y + 0.5) * TILE_SIZE;
-        if (canMove(worldX, worldY, PLAYER_RADIUS)) return { x: worldX, y: worldY };
+        if (canMoveTo(worldX, worldY)) return { x: worldX, y: worldY };
       }
     }
   }
@@ -456,12 +476,7 @@ function resolveSpawnPoint(col: number, row: number): { x: number; y: number } {
   return { x: TILE_SIZE * 2.5, y: TILE_SIZE * 2.5 };
 }
 
-function isBlocked(x: number, y: number): boolean {
-  if (x < 0 || y < 0 || x >= MAP_COLS * TILE_SIZE || y >= MAP_ROWS * TILE_SIZE) return true;
-  return isWallTile(Math.floor(x / TILE_SIZE), Math.floor(y / TILE_SIZE));
-}
-
-function hasLineOfSight(x1: number, y1: number, x2: number, y2: number): boolean {
+function hasLineOfSight(x1: number, y1: number, x2: number, y2: number, isBlockedAt: (x: number, y: number) => boolean): boolean {
   const distance = Math.hypot(x2 - x1, y2 - y1);
   const steps = Math.max(1, Math.ceil(distance / (TILE_SIZE / 3)));
 
@@ -469,7 +484,7 @@ function hasLineOfSight(x1: number, y1: number, x2: number, y2: number): boolean
     const t = index / steps;
     const x = x1 + (x2 - x1) * t;
     const y = y1 + (y2 - y1) * t;
-    if (isBlocked(x, y)) return false;
+    if (isBlockedAt(x, y)) return false;
   }
 
   return true;
@@ -477,4 +492,8 @@ function hasLineOfSight(x1: number, y1: number, x2: number, y2: number): boolean
 
 function distanceBetween(a: { x: number; y: number }, b: { x: number; y: number }): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function tileKey(col: number, row: number): string {
+  return `${col},${row}`;
 }

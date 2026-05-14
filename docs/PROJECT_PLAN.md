@@ -34,6 +34,7 @@ Core hook:
 - Phaser owns rendering, camera, input plumbing, and effects.
 - DOM owns HUD and menu UI.
 - Map, lights, spawn points, and tuning values live as data.
+- Match variants own per-round map seals, spawn rotation, light tuning, and difficulty scaling.
 - No gameplay rule should depend on sprite lifetime.
 - No major feature is added before the related system boundary is clear.
 
@@ -43,6 +44,7 @@ Core hook:
 src/
   game/
     content/
+      matchDirector.ts
       villageMap.ts
     input/
       actions.ts
@@ -86,10 +88,12 @@ Owns:
 - wall/floor/grave/tree tile definitions
 - light source positions
 - bot spawn positions
+- match director variants for changing map pressure and spawns
 
 Main file:
 
 - `src/game/content/villageMap.ts`
+- `src/game/content/matchDirector.ts`
 
 ### 3. Raycasting
 
@@ -193,6 +197,7 @@ Tasks:
 - Replace placeholder dots with readable directional silhouettes.
 - Add line-of-sight checks for bot target selection.
 - Add map hazards and risky shortcuts.
+- Add match director so each round changes spawns, blocked paths, lighting, bot pressure, and dawn speed.
 - Add clearer feedback when the player is exposed.
 
 Exit check:

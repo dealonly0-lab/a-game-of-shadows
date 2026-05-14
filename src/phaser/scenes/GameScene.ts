@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import { BOT_COUNT, BEAM_COOLDOWN_MS, PLAYER_RADIUS } from '../../game/simulation/constants';
+import { BEAM_COOLDOWN_MS, PLAYER_RADIUS } from '../../game/simulation/constants';
 import { GameSimulation } from '../../game/simulation/GameSimulation';
-import { MAP_DATA, MAP_HEIGHT, MAP_WIDTH, MAP_COLS, MAP_ROWS, TILE_SIZE, TileKind, isWallTile } from '../../game/content/villageMap';
+import { MAP_DATA, MAP_HEIGHT, MAP_WIDTH, MAP_COLS, MAP_ROWS, TILE_SIZE, TileKind } from '../../game/content/villageMap';
 import { buildWallSegments, Raycaster } from '../../game/simulation/raycast';
 import type { Entity, InputActionState, LightSource } from '../../game/simulation/types';
 import { applyMatchRewards, loadProfile, saveProfile, type MatchRewards, type PlayerProfile, xpProgressInLevel } from '../../game/progression/profile';
@@ -81,10 +81,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.simulation = new GameSimulation();
-    this.raycaster = new Raycaster(buildWallSegments(isWallTile, MAP_COLS, MAP_ROWS, TILE_SIZE));
-    this.audio = new GameAudio();
     this.profile = loadProfile();
+    this.simulation = this.createSimulation();
+    this.raycaster = this.createRaycaster();
+    this.audio = new GameAudio();
 
     this.createHud();
     this.createRenderLayers();
@@ -260,7 +260,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private restartRound(): void {
-    this.simulation = new GameSimulation();
+    this.simulation = this.createSimulation();
+    this.raycaster = this.createRaycaster();
     this.hud.gameOver.classList.add('is-hidden');
     this.isStarted = true;
     this.isPaused = false;
@@ -271,7 +272,19 @@ export class GameScene extends Phaser.Scene {
     this.hudNotice = null;
     this.hud.notice.classList.add('is-hidden');
     void this.audio.unlock();
+    this.drawMap();
     this.configureCamera();
+  }
+
+  private createSimulation(): GameSimulation {
+    return new GameSimulation({
+      playerLevel: this.profile.level,
+      matchesPlayed: this.profile.matchesPlayed
+    });
+  }
+
+  private createRaycaster(): Raycaster {
+    return new Raycaster(buildWallSegments((col, row) => this.simulation.isBlockedTile(col, row), MAP_COLS, MAP_ROWS, TILE_SIZE));
   }
 
   private renderProfileCard(): void {
@@ -359,6 +372,19 @@ export class GameScene extends Phaser.Scene {
         this.drawTile(g, col, row, MAP_DATA[row][col]);
       }
     }
+
+    for (const tile of this.simulation.variant.sealedTiles) {
+      this.drawSealedTile(g, tile.col, tile.row);
+    }
+  }
+
+  private drawSealedTile(g: Phaser.GameObjects.Graphics, col: number, row: number): void {
+    const x = col * TILE_SIZE;
+    const y = row * TILE_SIZE;
+    g.fillStyle(0x100816, 0.96).fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    g.lineStyle(2, 0x6d3a78, 0.7).strokeRect(x + 5, y + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+    g.lineStyle(1, 0xd4a843, 0.32).lineBetween(x + 11, y + 12, x + TILE_SIZE - 11, y + TILE_SIZE - 12);
+    g.lineBetween(x + TILE_SIZE - 11, y + 12, x + 11, y + TILE_SIZE - 12);
   }
 
   private drawTile(g: Phaser.GameObjects.Graphics, col: number, row: number, tile: TileKind): void {
@@ -639,7 +665,7 @@ export class GameScene extends Phaser.Scene {
 
     for (let row = 0; row < MAP_ROWS; row += 1) {
       for (let col = 0; col < MAP_COLS; col += 1) {
-        if (MAP_DATA[row][col] !== TileKind.Wall) continue;
+        if (!this.simulation.isBlockedTile(col, row)) continue;
         g.lineStyle(1, 0x44ff88, 0.26);
         g.strokeRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
       }
@@ -679,7 +705,7 @@ export class GameScene extends Phaser.Scene {
     for (let row = 0; row < MAP_ROWS; row += 1) {
       for (let col = 0; col < MAP_COLS; col += 1) {
         const tile = MAP_DATA[row][col];
-        if (tile === TileKind.Wall) {
+        if (this.simulation.isBlockedTile(col, row)) {
           g.fillStyle(0x433052, 0.82);
         } else if (tile === TileKind.Grave || tile === TileKind.Tree) {
           g.fillStyle(0x2d2440, 0.72);
@@ -727,7 +753,7 @@ export class GameScene extends Phaser.Scene {
         this.audio.playCountdownTick();
         this.lastCountdownSecond = count;
       }
-      this.hud.status.textContent = `MATCH STARTS IN ${count}`;
+      this.hud.status.textContent = `${this.simulation.variant.name} - THREAT ${this.simulation.variant.threatLabel} - STARTS IN ${count}`;
       this.hud.status.classList.remove('is-hidden');
     } else if (this.simulation.isPlayerProtected()) {
       if (this.lastCountdownSecond !== -1) {
@@ -775,7 +801,10 @@ export class GameScene extends Phaser.Scene {
         `FPS ${Math.round(this.game.loop.actualFps)}`,
         `STATE ${this.simulation.outcome}`,
         `PHASE ${this.simulation.matchPhase}`,
-        `ALIVE ${this.simulation.getAliveCount()} / ${BOT_COUNT + 1}`,
+        `VARIANT ${this.simulation.variant.name}`,
+        `THREAT ${this.simulation.variant.threatLabel} ${this.simulation.variant.difficulty}`,
+        `SEALS ${this.simulation.variant.sealedTiles.length}`,
+        `ALIVE ${this.simulation.getAliveCount()} / ${this.simulation.bots.length + 1}`,
         `MATCH ${Math.round(this.simulation.matchElapsedMs / 1000)}s`,
         `KILLS ${this.simulation.stats.playerKills}`,
         `SHOTS ${this.simulation.stats.playerShots}`,
