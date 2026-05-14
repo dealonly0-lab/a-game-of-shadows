@@ -301,8 +301,167 @@ Exit check:
 
 ## Immediate Next Steps
 
-1. Run a browser playtest of the current prototype.
-2. Fix runtime/rendering issues.
-3. Add debug overlay.
-4. Tune the first playable round.
-5. Only then move to stronger AI and game-feel polish.
+1. Fix the economy so rewards, prices, and unlock gates create long-term goals.
+2. Expand cosmetic/content inventory so Embers have enough sinks.
+3. Rework the home hub into proper Play, Loadout, Contracts, and Shop sections.
+4. Add more match content: hazards, bot archetypes, and map modifiers.
+5. Keep Phaser for now; the current problems are content, design, economy, and art direction, not engine capability.
+
+## Next Execution Plan: Economy And Content Overhaul
+
+This is the near-term plan we follow next. The goal is to stop players from buying everything too early and make the game feel like it has progression depth.
+
+### Step 1: Economy Rebalance
+
+Problem:
+
+- Current rewards are too high.
+- Current cosmetic prices are too low.
+- Players can unlock too much too early.
+
+Implementation:
+
+- Reduce base match XP and Ember payout.
+- Cap low-performance match rewards.
+- Separate XP rewards from Ember rewards more clearly.
+- Add level gates to cosmetics.
+- Add requirement gates to premium cosmetics, such as wins, total kills, or contract completions.
+- Make starter cosmetics cheap, rare cosmetics medium-term goals, and epic cosmetics long-term goals.
+
+Target values:
+
+- Weak match: 4-8 Embers.
+- Good match: 10-18 Embers.
+- Win with kills/contracts: 20-35 Embers.
+- Rare skins: 600-1,200 Embers plus level gate.
+- Epic skins: 2,000-5,000 Embers plus achievement gate.
+
+Exit check:
+
+- A player cannot buy all cosmetics after a few matches.
+- A new player has one obvious first unlock goal.
+- Epic cosmetics feel aspirational.
+
+### Step 2: Content Inventory Expansion
+
+Goal:
+
+- Give players more things to chase before multiplayer exists.
+
+Add content types:
+
+- 12-20 shadow skins.
+- Beam colors.
+- Spawn effects.
+- Kill effects.
+- Player silhouette variants.
+- Titles and badges.
+- Map-themed unlocks tied to specific achievements.
+
+Implementation rules:
+
+- Cosmetics are data-driven in `src/game/progression/cosmetics.ts`.
+- Profile stores ownership and equipped item IDs.
+- Renderer reads equipped cosmetic IDs but does not own progression rules.
+- No payment logic until local inventory is stable.
+
+Exit check:
+
+- Home hub shows enough locked and unlocked items to feel like a real progression system.
+- Equipped items visibly affect the match without changing gameplay balance.
+
+### Step 3: Home Hub Rework Into Sections
+
+Problem:
+
+- The current home hub is still too compressed and visually weak.
+- Everything is shown at once instead of organized like a game menu.
+
+New home sections:
+
+- Play: selected map, threat, mode, and start button.
+- Loadout: equipped shadow, beam, spawn, kill effect.
+- Contracts: daily and weekly objectives.
+- Shop: unlockable cosmetics.
+- Profile: stats, level, title, badges.
+
+Implementation:
+
+- Add DOM tab navigation.
+- Keep game canvas free of menu complexity.
+- Keep text readable on large desktop and narrow desktop.
+- Use preview swatches and item cards instead of raw text lists.
+
+Exit check:
+
+- No overlapping containers at 1024px, 1366px, 1920px, and ultrawide.
+- Player can understand what to do from the home screen within 5 seconds.
+
+### Step 4: Gameplay Content Depth
+
+Goal:
+
+- Matches should differ beyond spawn points and light radius.
+
+Add:
+
+- Map hazards: fog patches, moonlight cones, cursed ground, broken lantern zones.
+- Bot archetypes: Hunter, Scout, Stalker, Charger.
+- Match modifiers: Low Moon, Lantern Outage, Fast Dawn, Dense Fog.
+- More map layouts with smaller houses, alleys, courtyards, and readable landmarks.
+
+Implementation:
+
+- MatchDirector chooses modifiers.
+- Simulation owns hazard logic.
+- Phaser owns hazard rendering and feedback.
+- Content stays data-driven.
+
+Exit check:
+
+- A match has at least one memorable modifier or hazard.
+- Bots feel behaviorally different, not just faster/slower.
+
+### Step 5: Visual Direction Pass
+
+Problem:
+
+- Current visual style is a functional prototype, not a professional game look.
+
+Direction:
+
+- Keep spooky top-down 2D.
+- Move away from plain dark blocks and gold text everywhere.
+- Use stronger silhouettes, cleaner UI hierarchy, and purpose-built item previews.
+- Create a simple sprite/asset pipeline before adding many final assets.
+
+Implementation:
+
+- Replace procedural houses with sprite-like house components or generated sprites.
+- Add tile variation for roads, roofs, windows, fences, graves, and trees.
+- Reduce overuse of Cinzel for small UI.
+- Use a readable UI font for dense text and reserve Cinzel for headings.
+
+Exit check:
+
+- Screenshots read as a game, not a debug prototype.
+- Houses, roads, lights, and characters are identifiable at a glance.
+
+### Engine Decision
+
+Decision for now:
+
+- Stay on Phaser 3.
+
+Reason:
+
+- HOLLOW is still a 2D browser-first game.
+- The current weaknesses are economy, UI, content, and art direction.
+- Unity would not automatically fix those weaknesses and would slow down iteration.
+
+Re-evaluate Unity/Godot only if:
+
+- We decide to make the game 3D.
+- Browser-first instant play stops being the priority.
+- We need a native app-focused production pipeline.
+- Phaser rendering or tooling becomes the actual blocker.

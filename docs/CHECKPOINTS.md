@@ -115,4 +115,6 @@ Progress:
 - Spawn resolution now requires open tile clearance around player and bot spawns, preventing bots from appearing inside buildings or tight door pockets.
 - Game-over title now uses result-specific typography instead of oversized home-hero typography.
 - Game-over stats and rewards now sit in bounded summary panels so long win/loss text cannot overflow the viewport.
+- Next execution plan added for economy rebalance, content expansion, home hub sections, gameplay content depth, and visual direction.
+- Engine decision recorded: stay on Phaser 3 for now; current blockers are economy, UI, content, and art direction rather than engine capability.
 - Build passes after these changes.
