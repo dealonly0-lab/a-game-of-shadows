@@ -80,6 +80,14 @@ export type InputActionState = {
 export type GameOutcome = 'playing' | 'won' | 'lost';
 export type MatchPhase = 'countdown' | 'active' | 'ended';
 
+export type MatchStats = {
+  playerShots: number;
+  playerHits: number;
+  playerKills: number;
+  botShots: number;
+  survivedMs: number;
+};
+
 export type GameplayEvent =
   | { type: 'beam-fired'; x: number; y: number; ownerId: string; isPlayer: boolean }
   | { type: 'beam-impact'; x: number; y: number }

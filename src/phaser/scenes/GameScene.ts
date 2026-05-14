@@ -15,19 +15,28 @@ type ImpactRipple = {
   maxRadius: number;
 };
 
+type HudNotice = {
+  text: string;
+  ageMs: number;
+  durationMs: number;
+};
+
 type HudRefs = {
   root: HTMLDivElement;
   title: HTMLDivElement;
   gameOver: HTMLDivElement;
+  pause: HTMLDivElement;
   debug: HTMLDivElement;
   souls: HTMLSpanElement;
   phase: HTMLDivElement;
   beam: HTMLDivElement;
+  notice: HTMLDivElement;
   dangerFill: HTMLDivElement;
   status: HTMLDivElement;
   dawnFill: HTMLDivElement;
   gameOverTitle: HTMLHeadingElement;
   gameOverMessage: HTMLParagraphElement;
+  gameOverStats: HTMLDivElement;
 };
 
 export class GameScene extends Phaser.Scene {
@@ -51,10 +60,13 @@ export class GameScene extends Phaser.Scene {
   private dawnOverlay!: Phaser.GameObjects.Rectangle;
 
   private isStarted = false;
+  private isPaused = false;
   private debugEnabled = false;
   private pointerWasDown = false;
   private debugKeyWasDown = false;
+  private pauseKeyWasDown = false;
   private impactRipples: ImpactRipple[] = [];
+  private hudNotice: HudNotice | null = null;
   private lastCountdownSecond = 0;
   private lastExposedPulseMs = 0;
 
@@ -77,6 +89,12 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, deltaMs: number): void {
     if (!this.isStarted) return;
 
+    this.updatePauseToggle();
+    if (this.isPaused) {
+      this.updateHudNotice(deltaMs);
+      return;
+    }
+
     const actions = this.readActions();
     this.simulation.update(deltaMs, actions);
     this.handleGameplayEvents();
@@ -94,6 +112,7 @@ export class GameScene extends Phaser.Scene {
     this.renderDebug();
     this.renderMinimap();
     this.updateHud();
+    this.updateHudNotice(deltaMs);
 
     if (this.simulation.outcome !== 'playing') {
       this.showGameOver();
@@ -110,6 +129,7 @@ export class GameScene extends Phaser.Scene {
         <div id="beam-display" class="hud__beam">BEAM READY</div>
       </div>
       <div id="status-display" class="hud__status"></div>
+      <div id="notice-display" class="hud__notice is-hidden"></div>
       <div class="hud__bottom">
         <div class="hud__danger"><div id="danger-fill" class="hud__danger-fill"></div></div>
         <div class="hud__bar"><div id="dawn-fill" class="hud__fill"></div></div>
@@ -135,11 +155,22 @@ export class GameScene extends Phaser.Scene {
       <div class="game-over__inner">
         <h2 id="game-over-title" class="title__name">YOUR SHADOW FADES</h2>
         <p id="game-over-message" class="game-over__message">The light found you.</p>
+        <div id="game-over-stats" class="game-over__stats"></div>
         <button id="restart-button" class="button" type="button">Play Again</button>
       </div>
     `;
 
-    document.body.append(hud, title, gameOver);
+    const pause = document.createElement('div');
+    pause.className = 'pause is-hidden';
+    pause.innerHTML = `
+      <div class="pause__inner">
+        <h2 class="pause__title">PAUSED</h2>
+        <button id="resume-button" class="button" type="button">Resume</button>
+        <button id="pause-restart-button" class="button button--secondary" type="button">Restart</button>
+      </div>
+    `;
+
+    document.body.append(hud, title, gameOver, pause);
 
     title.querySelector<HTMLButtonElement>('#start-button')?.addEventListener('click', () => {
       void this.audio.unlock();
@@ -150,20 +181,30 @@ export class GameScene extends Phaser.Scene {
     gameOver.querySelector<HTMLButtonElement>('#restart-button')?.addEventListener('click', () => {
       this.restartRound();
     });
+    pause.querySelector<HTMLButtonElement>('#resume-button')?.addEventListener('click', () => {
+      this.setPaused(false);
+    });
+    pause.querySelector<HTMLButtonElement>('#pause-restart-button')?.addEventListener('click', () => {
+      this.restartRound();
+      this.setPaused(false);
+    });
 
     this.hud = {
       root: hud,
       title,
       gameOver,
+      pause,
       debug: hud.querySelector<HTMLDivElement>('#debug-panel')!,
       souls: hud.querySelector<HTMLSpanElement>('#souls-count')!,
       phase: hud.querySelector<HTMLDivElement>('#phase-display')!,
       beam: hud.querySelector<HTMLDivElement>('#beam-display')!,
+      notice: hud.querySelector<HTMLDivElement>('#notice-display')!,
       dangerFill: hud.querySelector<HTMLDivElement>('#danger-fill')!,
       status: hud.querySelector<HTMLDivElement>('#status-display')!,
       dawnFill: hud.querySelector<HTMLDivElement>('#dawn-fill')!,
       gameOverTitle: gameOver.querySelector<HTMLHeadingElement>('#game-over-title')!,
-      gameOverMessage: gameOver.querySelector<HTMLParagraphElement>('#game-over-message')!
+      gameOverMessage: gameOver.querySelector<HTMLParagraphElement>('#game-over-message')!,
+      gameOverStats: gameOver.querySelector<HTMLDivElement>('#game-over-stats')!
     };
   }
 
@@ -194,7 +235,8 @@ export class GameScene extends Phaser.Scene {
       DOWN: Phaser.Input.Keyboard.KeyCodes.DOWN,
       LEFT: Phaser.Input.Keyboard.KeyCodes.LEFT,
       RIGHT: Phaser.Input.Keyboard.KeyCodes.RIGHT,
-      F1: Phaser.Input.Keyboard.KeyCodes.F1
+      F1: Phaser.Input.Keyboard.KeyCodes.F1,
+      ESC: Phaser.Input.Keyboard.KeyCodes.ESC
     }) as Record<string, Phaser.Input.Keyboard.Key>;
 
     this.input.keyboard.on('keydown-F1', (event: KeyboardEvent) => event.preventDefault());
@@ -209,10 +251,26 @@ export class GameScene extends Phaser.Scene {
     this.simulation = new GameSimulation();
     this.hud.gameOver.classList.add('is-hidden');
     this.isStarted = true;
+    this.isPaused = false;
     this.lastCountdownSecond = 0;
     this.lastExposedPulseMs = 0;
+    this.hudNotice = null;
+    this.hud.notice.classList.add('is-hidden');
     void this.audio.unlock();
     this.configureCamera();
+  }
+
+  private updatePauseToggle(): void {
+    const isDown = this.keys.ESC.isDown;
+    if (isDown && !this.pauseKeyWasDown && this.simulation.outcome === 'playing') {
+      this.setPaused(!this.isPaused);
+    }
+    this.pauseKeyWasDown = isDown;
+  }
+
+  private setPaused(paused: boolean): void {
+    this.isPaused = paused;
+    this.hud.pause.classList.toggle('is-hidden', !paused);
   }
 
   private updateDebugToggle(): void {
@@ -438,7 +496,23 @@ export class GameScene extends Phaser.Scene {
         this.audio.playKill(event.byPlayer);
         this.cameras.main.shake(event.byPlayer ? 170 : 230, event.byPlayer ? 0.004 : 0.006);
         this.impactRipples.push({ x: event.x, y: event.y, ageMs: 0, durationMs: 520, color: event.byPlayer ? 0xd4a843 : 0xe06040, maxRadius: 72 });
+        this.showNotice(event.byPlayer ? 'SHADOW TAKEN' : 'A SHADOW FELL');
       }
+    }
+  }
+
+  private showNotice(text: string, durationMs = 1700): void {
+    this.hudNotice = { text, ageMs: 0, durationMs };
+    this.hud.notice.textContent = text;
+    this.hud.notice.classList.remove('is-hidden');
+  }
+
+  private updateHudNotice(deltaMs: number): void {
+    if (!this.hudNotice) return;
+    this.hudNotice.ageMs += deltaMs;
+    if (this.hudNotice.ageMs >= this.hudNotice.durationMs) {
+      this.hudNotice = null;
+      this.hud.notice.classList.add('is-hidden');
     }
   }
 
@@ -658,6 +732,8 @@ export class GameScene extends Phaser.Scene {
         `PHASE ${this.simulation.matchPhase}`,
         `ALIVE ${this.simulation.getAliveCount()} / ${BOT_COUNT + 1}`,
         `MATCH ${Math.round(this.simulation.matchElapsedMs / 1000)}s`,
+        `KILLS ${this.simulation.stats.playerKills}`,
+        `SHOTS ${this.simulation.stats.playerShots}`,
         `COUNTDOWN ${Math.round(this.simulation.countdownMs / 1000)}s`,
         `VEIL ${Math.round(this.simulation.playerSpawnGraceMs / 1000)}s`,
         `DAWN ${Math.round(this.simulation.dawnProgress * 100)}%`,
@@ -683,9 +759,16 @@ export class GameScene extends Phaser.Scene {
     if (!this.hud.gameOver.classList.contains('is-hidden')) return;
 
     const won = this.simulation.outcome === 'won';
+    const accuracy = this.simulation.stats.playerShots > 0 ? Math.round((this.simulation.stats.playerHits / this.simulation.stats.playerShots) * 100) : 0;
     this.hud.gameOverTitle.textContent = won ? 'LAST SHADOW STANDING' : 'YOUR SHADOW FADES';
     this.hud.gameOverTitle.style.color = won ? '#d4a843' : '#7a2a14';
     this.hud.gameOverMessage.textContent = won ? 'You survived the night. The village is yours.' : 'The light found you. You are consumed.';
+    this.hud.gameOverStats.innerHTML = [
+      `Survived ${Math.round(this.simulation.stats.survivedMs / 1000)}s`,
+      `Kills ${this.simulation.stats.playerKills}`,
+      `Shots ${this.simulation.stats.playerShots}`,
+      `Accuracy ${accuracy}%`
+    ].join('<br>');
     this.hud.gameOver.classList.remove('is-hidden');
   }
 

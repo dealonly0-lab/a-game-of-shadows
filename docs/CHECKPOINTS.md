@@ -92,4 +92,7 @@ Progress:
 - Spawn positions now resolve to the nearest valid open tile if authored spawn data lands inside collision.
 - First procedural audio system added using Web Audio.
 - Countdown, round start, beam fire, beam impact, kills, exposure warning, and ambience now have sound.
+- Match stats added for player shots, hits, kills, and survival time.
+- Pause menu added with resume and restart.
+- Combat notices added for kills.
 - Build passes after these changes.

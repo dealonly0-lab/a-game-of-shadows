@@ -17,7 +17,7 @@ import {
   PLAYER_SPAWN_GRACE_MS,
   PLAYER_SPEED
 } from './constants';
-import type { BotEntity, Entity, GameplayEvent, GameOutcome, InputActionState, LightSource, MatchPhase, Particle, Projectile } from './types';
+import type { BotEntity, Entity, GameplayEvent, GameOutcome, InputActionState, LightSource, MatchPhase, MatchStats, Particle, Projectile } from './types';
 import { BOT_SPAWNS, LIGHT_DEFS, MAP_COLS, MAP_ROWS, PLAYER_SPAWN, TILE_SIZE, isWallTile } from '../content/villageMap';
 
 export class GameSimulation {
@@ -27,6 +27,13 @@ export class GameSimulation {
   readonly projectiles: Projectile[] = [];
   readonly particles: Particle[] = [];
   readonly events: GameplayEvent[] = [];
+  readonly stats: MatchStats = {
+    playerShots: 0,
+    playerHits: 0,
+    playerKills: 0,
+    botShots: 0,
+    survivedMs: 0
+  };
 
   matchPhase: MatchPhase = 'countdown';
   countdownMs = MATCH_COUNTDOWN_MS;
@@ -86,6 +93,7 @@ export class GameSimulation {
       this.updateDawn(deltaMs);
       this.updateOutcome();
       this.matchElapsedMs += deltaMs;
+      this.stats.survivedMs = this.matchElapsedMs;
       if (this.playerSpawnGraceMs > 0) this.playerSpawnGraceMs = Math.max(0, this.playerSpawnGraceMs - deltaMs);
     } else {
       for (const bot of this.bots) bot.aiState = 'idle';
@@ -267,6 +275,10 @@ export class GameSimulation {
 
       if (victim) {
         victim.alive = false;
+        if (projectile.ownerId === this.player.id) {
+          this.stats.playerHits += 1;
+          this.stats.playerKills += 1;
+        }
         this.spawnParticles(victim.x, victim.y, true);
         this.events.push({ type: 'entity-killed', x: victim.x, y: victim.y, victimId: victim.id, byPlayer: projectile.ownerId === this.player.id });
         this.projectiles.splice(index, 1);
@@ -305,6 +317,9 @@ export class GameSimulation {
   }
 
   private fire(shooter: Entity): void {
+    if (shooter.isPlayer) this.stats.playerShots += 1;
+    else this.stats.botShots += 1;
+
     if (shooter.isPlayer) {
       this.muzzleFlashMs = 160;
       this.muzzleX = shooter.x;

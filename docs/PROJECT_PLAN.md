@@ -258,6 +258,7 @@ Tasks:
 - Add cosmetic shadow skins.
 - Add unlockable cosmetics.
 - Add match stats.
+- Add pause and resume flow.
 - Add leaderboard stub.
 - Add local inventory model before payments.
 
