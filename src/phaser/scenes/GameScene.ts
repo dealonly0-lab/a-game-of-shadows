@@ -488,9 +488,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (tile === TileKind.Wall) {
-      g.fillStyle(0x1b1228, 1).fillRect(x, y, TILE_SIZE, TILE_SIZE);
-      g.fillStyle(0x120d1c, 1).fillRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
-      g.lineStyle(1, 0x28193a, 1).strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+      this.drawHauntedHouseTile(g, col, row);
       return;
     }
 
@@ -509,6 +507,52 @@ export class GameScene extends Phaser.Scene {
       const cy = y + TILE_SIZE * 0.72;
       g.lineStyle(4, 0x181020, 1).lineBetween(cx, cy + 10, cx, cy - 20);
       g.lineStyle(2, 0x181020, 1).lineBetween(cx, cy - 10, cx - 16, cy - 24).lineBetween(cx, cy - 15, cx + 14, cy - 26);
+    }
+  }
+
+  private drawHauntedHouseTile(g: Phaser.GameObjects.Graphics, col: number, row: number): void {
+    const x = col * TILE_SIZE;
+    const y = row * TILE_SIZE;
+    const topOpen = !this.simulation.isBlockedTile(col, row - 1);
+    const bottomOpen = !this.simulation.isBlockedTile(col, row + 1);
+    const leftOpen = !this.simulation.isBlockedTile(col - 1, row);
+    const rightOpen = !this.simulation.isBlockedTile(col + 1, row);
+    const seed = (col * 928371 + row * 689287) >>> 0;
+
+    g.fillStyle(0x160b1f, 1).fillRect(x, y, TILE_SIZE, TILE_SIZE);
+    g.fillStyle((col + row) % 2 === 0 ? 0x21142d : 0x1b1028, 1).fillRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+
+    if (topOpen) {
+      g.fillStyle(0x2b1838, 1);
+      g.fillTriangle(x - 3, y + 9, x + TILE_SIZE / 2, y - 9, x + TILE_SIZE + 3, y + 9);
+      g.lineStyle(2, 0x5c3a78, 0.8).lineBetween(x + 3, y + 8, x + TILE_SIZE - 3, y + 8);
+    }
+
+    if (bottomOpen) {
+      g.fillStyle(0x0c0712, 0.9).fillRect(x + 2, y + TILE_SIZE - 10, TILE_SIZE - 4, 8);
+      g.lineStyle(1, 0x392348, 0.9).lineBetween(x + 5, y + TILE_SIZE - 12, x + TILE_SIZE - 5, y + TILE_SIZE - 12);
+    }
+
+    if (leftOpen) g.fillStyle(0x0e0816, 0.72).fillRect(x, y + 7, 7, TILE_SIZE - 14);
+    if (rightOpen) g.fillStyle(0x0e0816, 0.72).fillRect(x + TILE_SIZE - 7, y + 7, 7, TILE_SIZE - 14);
+
+    g.lineStyle(1, 0x352044, 0.75);
+    g.lineBetween(x + 8, y + 17, x + TILE_SIZE - 8, y + 15);
+    g.lineBetween(x + 10, y + 29, x + TILE_SIZE - 10, y + 31);
+
+    if (seed % 7 === 0 && (topOpen || bottomOpen || leftOpen || rightOpen)) {
+      const wx = x + 15 + (seed % 2) * 12;
+      const wy = y + 17 + (seed % 3) * 4;
+      g.fillStyle(seed % 5 === 0 ? 0xd48a35 : 0x4b315f, seed % 5 === 0 ? 0.86 : 0.72);
+      g.fillRect(wx, wy, 10, 14);
+      g.lineStyle(1, 0x0b0610, 0.75).strokeRect(wx, wy, 10, 14);
+      g.lineBetween(wx + 5, wy + 1, wx + 5, wy + 13);
+      g.lineBetween(wx + 1, wy + 7, wx + 9, wy + 7);
+    }
+
+    if (topOpen && seed % 11 === 0) {
+      g.fillStyle(0x0b0610, 1).fillRect(x + TILE_SIZE - 14, y - 4, 8, 13);
+      g.fillStyle(0x5b3340, 0.7).fillCircle(x + TILE_SIZE - 10, y - 8, 4);
     }
   }
 

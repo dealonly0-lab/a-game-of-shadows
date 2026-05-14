@@ -107,4 +107,6 @@ Progress:
 - Game-over screen now supports returning to the home hub instead of forcing immediate replay.
 - Home hub scale corrected after screenshot review; layout now uses most of the viewport instead of appearing as a tiny centered panel.
 - Next-hunt panel now includes a larger map-preview surface for stronger game-menu presentation.
+- Medium-width home layout fixed so panels stack before they overlap the hero.
+- Wall tiles now render as first-pass haunted house blocks with roof edges, windows, side shadows, and occasional chimneys.
 - Build passes after these changes.

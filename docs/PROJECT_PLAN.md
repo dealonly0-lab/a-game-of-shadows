@@ -273,6 +273,8 @@ Tasks:
 - Upgrade the title screen into a home hub with play, profile, daily goals, and next-match info.
 - Add home navigation after match end so players can inspect progress before starting another hunt.
 - Keep the home hub scaled like a real game menu across large desktop viewports.
+- Add medium-width layout rules so the home hub cannot overlap on tablet or narrow desktop screens.
+- Replace plain wall blocks with first-pass haunted house rendering before the sprite pipeline.
 
 Exit check:
 

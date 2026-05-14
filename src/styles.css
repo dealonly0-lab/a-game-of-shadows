@@ -176,6 +176,8 @@ body {
     linear-gradient(135deg, #020008 0%, #090511 48%, #140813 100%);
   color: #d4a843;
   font-family: Cinzel, serif;
+  overflow: auto;
+  padding: 30px 0;
 }
 
 .home-shell {
@@ -568,6 +570,43 @@ body {
 
 .is-hidden {
   display: none;
+}
+
+@media (max-width: 1200px) {
+  .home-shell {
+    width: min(920px, calc(100vw - 36px));
+    min-height: auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    gap: 16px;
+    margin: auto;
+  }
+
+  .home-topbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .home-topbar span:nth-child(2) {
+    display: none;
+  }
+
+  .home-hero {
+    grid-row: auto;
+  }
+
+  .home-mode {
+    min-height: 460px;
+    padding: clamp(34px, 6vw, 58px);
+  }
+
+  .home-panel,
+  .home-panel--map {
+    align-self: stretch;
+  }
+
+  .title__name {
+    font-size: clamp(78px, 17vw, 150px);
+  }
 }
 
 @media (max-width: 640px) {
