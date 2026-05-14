@@ -88,4 +88,6 @@ Progress:
 - Beam fire, beam impact, and kills now emit gameplay events for renderer feedback.
 - Camera shake and impact rings added for combat feedback.
 - Player and bot dots replaced with directional silhouettes.
+- Fixed map generation order so roads no longer carve visual tunnels through building blocks.
+- Spawn positions now resolve to the nearest valid open tile if authored spawn data lands inside collision.
 - Build passes after these changes.

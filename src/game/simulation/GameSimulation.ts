@@ -43,10 +43,11 @@ export class GameSimulation {
   private projectileId = 0;
 
   constructor() {
+    const playerSpawn = resolveSpawnPoint(PLAYER_SPAWN.col, PLAYER_SPAWN.row);
     this.player = {
       id: 'player',
-      x: (PLAYER_SPAWN.col + 0.5) * TILE_SIZE,
-      y: (PLAYER_SPAWN.row + 0.5) * TILE_SIZE,
+      x: playerSpawn.x,
+      y: playerSpawn.y,
       angle: 0,
       alive: true,
       isPlayer: true,
@@ -55,20 +56,7 @@ export class GameSimulation {
     };
 
     this.bots = BOT_SPAWNS.slice(0, BOT_COUNT).map((spawn, index) => ({
-      id: `bot-${index}`,
-      x: (spawn.col + 0.5) * TILE_SIZE,
-      y: (spawn.row + 0.5) * TILE_SIZE,
-      angle: Math.random() * Math.PI * 2,
-      alive: true,
-      isPlayer: false,
-      cooldownMs: index * 260,
-      shadow: null,
-      aiState: 'idle',
-      wanderAngle: Math.random() * Math.PI * 2,
-      wanderMs: 0,
-      memoryMs: 0,
-      lastKnownTargetX: (spawn.col + 0.5) * TILE_SIZE,
-      lastKnownTargetY: (spawn.row + 0.5) * TILE_SIZE
+      ...createBot(index, spawn.col, spawn.row)
     }));
 
     this.lights = LIGHT_DEFS.map((light, index) => ({
@@ -412,6 +400,45 @@ function canMove(x: number, y: number, radius: number): boolean {
   ];
 
   return points.every(([px, py]) => !isBlocked(px, py));
+}
+
+function createBot(index: number, col: number, row: number): BotEntity {
+  const spawn = resolveSpawnPoint(col, row);
+  return {
+    id: `bot-${index}`,
+    x: spawn.x,
+    y: spawn.y,
+    angle: Math.random() * Math.PI * 2,
+    alive: true,
+    isPlayer: false,
+    cooldownMs: index * 260,
+    shadow: null,
+    aiState: 'idle',
+    wanderAngle: Math.random() * Math.PI * 2,
+    wanderMs: 0,
+    memoryMs: 0,
+    lastKnownTargetX: spawn.x,
+    lastKnownTargetY: spawn.y
+  };
+}
+
+function resolveSpawnPoint(col: number, row: number): { x: number; y: number } {
+  const preferredX = (col + 0.5) * TILE_SIZE;
+  const preferredY = (row + 0.5) * TILE_SIZE;
+  if (canMove(preferredX, preferredY, PLAYER_RADIUS)) return { x: preferredX, y: preferredY };
+
+  for (let radius = 1; radius <= 8; radius += 1) {
+    for (let y = row - radius; y <= row + radius; y += 1) {
+      for (let x = col - radius; x <= col + radius; x += 1) {
+        if (Math.abs(x - col) !== radius && Math.abs(y - row) !== radius) continue;
+        const worldX = (x + 0.5) * TILE_SIZE;
+        const worldY = (y + 0.5) * TILE_SIZE;
+        if (canMove(worldX, worldY, PLAYER_RADIUS)) return { x: worldX, y: worldY };
+      }
+    }
+  }
+
+  return { x: TILE_SIZE * 2.5, y: TILE_SIZE * 2.5 };
 }
 
 function isBlocked(x: number, y: number): boolean {

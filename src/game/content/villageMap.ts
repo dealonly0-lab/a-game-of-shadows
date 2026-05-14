@@ -12,7 +12,7 @@ export const MAP_ROWS = 36;
 export const MAP_WIDTH = MAP_COLS * TILE_SIZE;
 export const MAP_HEIGHT = MAP_ROWS * TILE_SIZE;
 
-export const PLAYER_SPAWN = { col: 10, row: 18 } as const;
+export const PLAYER_SPAWN = { col: 14, row: 18 } as const;
 
 const BUILDINGS = [
   { col: 4, row: 4, width: 7, height: 5, doors: [{ col: 7, row: 8 }] },
@@ -51,7 +51,7 @@ export const LIGHT_DEFS = [
   { col: 30, row: 10, radius: 132, kind: 'lantern' },
   { col: 43, row: 9, radius: 124, kind: 'lantern' },
   { col: 56, row: 8, radius: 130, kind: 'lantern' },
-  { col: 10, row: 18, radius: 168, kind: 'bonfire' },
+  { col: 14, row: 18, radius: 168, kind: 'bonfire' },
   { col: 25, row: 20, radius: 126, kind: 'lantern' },
   { col: 35, row: 18, radius: 170, kind: 'bonfire' },
   { col: 50, row: 20, radius: 132, kind: 'lantern' },
@@ -62,13 +62,13 @@ export const LIGHT_DEFS = [
 ] as const;
 
 export const BOT_SPAWNS = [
-  { col: 54, row: 7 },
-  { col: 48, row: 29 },
-  { col: 18, row: 6 },
-  { col: 33, row: 17 },
+  { col: 56, row: 10 },
+  { col: 48, row: 28 },
+  { col: 18, row: 10 },
+  { col: 33, row: 16 },
   { col: 57, row: 18 },
   { col: 23, row: 28 },
-  { col: 42, row: 8 }
+  { col: 42, row: 10 }
 ] as const;
 
 export function isWallTile(col: number, row: number): boolean {
@@ -87,6 +87,13 @@ function createVillageMap(): TileKind[][] {
     }
   }
 
+  carveRoad(map, 2, 18, 61, 18);
+  carveRoad(map, 10, 2, 10, 33);
+  carveRoad(map, 35, 2, 35, 33);
+  carveRoad(map, 54, 2, 54, 33);
+  carveRoad(map, 2, 10, 61, 10);
+  carveRoad(map, 2, 29, 61, 29);
+
   for (const building of BUILDINGS) {
     for (let row = building.row; row < building.row + building.height; row += 1) {
       for (let col = building.col; col < building.col + building.width; col += 1) {
@@ -100,19 +107,12 @@ function createVillageMap(): TileKind[][] {
   }
 
   for (const [col, row] of GRAVES) {
-    map[row][col] = TileKind.Grave;
+    if (map[row][col] === TileKind.Floor) map[row][col] = TileKind.Grave;
   }
 
   for (const [col, row] of TREES) {
-    map[row][col] = TileKind.Tree;
+    if (map[row][col] === TileKind.Floor) map[row][col] = TileKind.Tree;
   }
-
-  carveRoad(map, 2, 18, 61, 18);
-  carveRoad(map, 10, 2, 10, 33);
-  carveRoad(map, 35, 2, 35, 33);
-  carveRoad(map, 54, 2, 54, 33);
-  carveRoad(map, 2, 10, 61, 10);
-  carveRoad(map, 2, 29, 61, 29);
 
   return map;
 }
