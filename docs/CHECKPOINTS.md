@@ -105,4 +105,6 @@ Progress:
 - Title screen upgraded into a home hub with Play, profile progression, daily contracts, and next-hunt map/threat info.
 - Home hub visual hierarchy improved with topbar, featured hunt panel, stronger CTA, and cleaner information cards.
 - Game-over screen now supports returning to the home hub instead of forcing immediate replay.
+- Home hub scale corrected after screenshot review; layout now uses most of the viewport instead of appearing as a tiny centered panel.
+- Next-hunt panel now includes a larger map-preview surface for stronger game-menu presentation.
 - Build passes after these changes.

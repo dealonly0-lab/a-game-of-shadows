@@ -182,6 +182,13 @@ export class GameScene extends Phaser.Scene {
             <span>Next Hunt</span>
             <strong>${this.simulation.variant.threatLabel}</strong>
           </div>
+          <div class="map-preview" aria-hidden="true">
+            <div class="map-preview__path map-preview__path--one"></div>
+            <div class="map-preview__path map-preview__path--two"></div>
+            <div class="map-preview__light map-preview__light--a"></div>
+            <div class="map-preview__light map-preview__light--b"></div>
+            <div class="map-preview__spawn"></div>
+          </div>
           <div id="title-map" class="map-card"></div>
         </aside>
       </div>
