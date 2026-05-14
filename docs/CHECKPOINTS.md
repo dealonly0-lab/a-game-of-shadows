@@ -84,4 +84,8 @@ Progress:
 - Player spawn protection added as `SHADOW VEIL`.
 - Danger bar added for exposed-state pressure.
 - Minimap added for orientation in the larger village.
+- Bot AI now has hunt and investigate behavior with short memory of last known target position.
+- Beam fire, beam impact, and kills now emit gameplay events for renderer feedback.
+- Camera shake and impact rings added for combat feedback.
+- Player and bot dots replaced with directional silhouettes.
 - Build passes after these changes.

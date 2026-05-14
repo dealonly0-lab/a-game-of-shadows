@@ -1,6 +1,12 @@
 export const PLAYER_RADIUS = 10;
 export const PLAYER_SPEED = 185;
 export const BOT_SPEED = 92;
+export const BOT_WANDER_SPEED = 76;
+export const BOT_INVESTIGATE_SPEED = 94;
+export const BOT_HUNT_SPEED = 112;
+export const BOT_MEMORY_MS = 2_600;
+export const BOT_TARGET_RANGE = 430;
+export const BOT_FIRE_RANGE = 285;
 export const BEAM_SPEED = 620;
 export const BEAM_RANGE = 460;
 export const BEAM_COOLDOWN_MS = 780;

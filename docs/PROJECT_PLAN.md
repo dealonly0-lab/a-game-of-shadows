@@ -189,6 +189,8 @@ Tasks:
 - Add round timer and clearer dawn phases.
 - Add minimap for larger-map orientation.
 - Add better bot AI states: patrol, investigate shadow, chase, retreat.
+- Add event-based renderer feedback for beam fire, impacts, and kills.
+- Replace placeholder dots with readable directional silhouettes.
 - Add line-of-sight checks for bot target selection.
 - Add map hazards and risky shortcuts.
 - Add clearer feedback when the player is exposed.

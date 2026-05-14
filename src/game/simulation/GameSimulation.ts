@@ -1,6 +1,11 @@
 import {
   BOT_COUNT,
-  BOT_SPEED,
+  BOT_FIRE_RANGE,
+  BOT_HUNT_SPEED,
+  BOT_INVESTIGATE_SPEED,
+  BOT_MEMORY_MS,
+  BOT_TARGET_RANGE,
+  BOT_WANDER_SPEED,
   BEAM_COOLDOWN_MS,
   BEAM_RANGE,
   BEAM_SPEED,
@@ -12,7 +17,7 @@ import {
   PLAYER_SPAWN_GRACE_MS,
   PLAYER_SPEED
 } from './constants';
-import type { BotEntity, Entity, GameOutcome, InputActionState, LightSource, MatchPhase, Particle, Projectile } from './types';
+import type { BotEntity, Entity, GameplayEvent, GameOutcome, InputActionState, LightSource, MatchPhase, Particle, Projectile } from './types';
 import { BOT_SPAWNS, LIGHT_DEFS, MAP_COLS, MAP_ROWS, PLAYER_SPAWN, TILE_SIZE, isWallTile } from '../content/villageMap';
 
 export class GameSimulation {
@@ -21,6 +26,7 @@ export class GameSimulation {
   readonly lights: LightSource[];
   readonly projectiles: Projectile[] = [];
   readonly particles: Particle[] = [];
+  readonly events: GameplayEvent[] = [];
 
   matchPhase: MatchPhase = 'countdown';
   countdownMs = MATCH_COUNTDOWN_MS;
@@ -59,7 +65,10 @@ export class GameSimulation {
       shadow: null,
       aiState: 'idle',
       wanderAngle: Math.random() * Math.PI * 2,
-      wanderMs: 0
+      wanderMs: 0,
+      memoryMs: 0,
+      lastKnownTargetX: (spawn.col + 0.5) * TILE_SIZE,
+      lastKnownTargetY: (spawn.row + 0.5) * TILE_SIZE
     }));
 
     this.lights = LIGHT_DEFS.map((light, index) => ({
@@ -109,6 +118,10 @@ export class GameSimulation {
     return this.bots.filter((bot) => bot.alive).length + (this.player.alive ? 1 : 0);
   }
 
+  consumeEvents(): GameplayEvent[] {
+    return this.events.splice(0, this.events.length);
+  }
+
   getPlayerDangerLevel(): number {
     if (this.playerSpawnGraceMs > 0) return 0;
     return this.playerExposure;
@@ -153,17 +166,30 @@ export class GameSimulation {
 
       if (bot.cooldownMs > 0) bot.cooldownMs = Math.max(0, bot.cooldownMs - deltaMs);
       if (bot.wanderMs > 0) bot.wanderMs -= deltaMs;
+      if (bot.memoryMs > 0) bot.memoryMs = Math.max(0, bot.memoryMs - deltaMs);
 
-      const target = this.findNearestShadowedTarget(bot, 400);
+      const target = this.findNearestShadowedTarget(bot, BOT_TARGET_RANGE);
       if (target) {
         bot.aiState = 'hunt';
         bot.wanderAngle = Math.atan2(target.y - bot.y, target.x - bot.x);
         bot.angle = bot.wanderAngle;
+        bot.lastKnownTargetX = target.x;
+        bot.lastKnownTargetY = target.y;
+        bot.memoryMs = BOT_MEMORY_MS;
 
         const distance = distanceBetween(bot, target);
-        if (distance < 280 && bot.cooldownMs <= 0 && bot.shadow) {
+        if (distance < BOT_FIRE_RANGE && bot.cooldownMs <= 0 && bot.shadow) {
           this.fire(bot);
           bot.cooldownMs = BEAM_COOLDOWN_MS + Math.random() * 1000;
+        }
+      } else if (bot.memoryMs > 0) {
+        bot.aiState = 'investigate';
+        bot.wanderAngle = Math.atan2(bot.lastKnownTargetY - bot.y, bot.lastKnownTargetX - bot.x);
+        bot.angle = bot.wanderAngle;
+
+        if (Math.hypot(bot.lastKnownTargetX - bot.x, bot.lastKnownTargetY - bot.y) < 22) {
+          bot.memoryMs = 0;
+          bot.wanderMs = 0;
         }
       } else if (bot.wanderMs <= 0) {
         bot.aiState = 'wander';
@@ -174,8 +200,9 @@ export class GameSimulation {
         bot.aiState = 'wander';
       }
 
-      const dx = Math.cos(bot.wanderAngle) * BOT_SPEED * dt;
-      const dy = Math.sin(bot.wanderAngle) * BOT_SPEED * dt;
+      const speed = bot.aiState === 'hunt' ? BOT_HUNT_SPEED : bot.aiState === 'investigate' ? BOT_INVESTIGATE_SPEED : BOT_WANDER_SPEED;
+      const dx = Math.cos(bot.wanderAngle) * speed * dt;
+      const dy = Math.sin(bot.wanderAngle) * speed * dt;
       const movedX = this.moveEntityAxis(bot, dx, 0);
       const movedY = this.moveEntityAxis(bot, 0, dy);
 
@@ -239,6 +266,7 @@ export class GameSimulation {
 
       if (projectile.traveled > BEAM_RANGE || isBlocked(projectile.x, projectile.y)) {
         this.spawnParticles(projectile.x, projectile.y, false);
+        this.events.push({ type: 'beam-impact', x: projectile.x, y: projectile.y });
         this.projectiles.splice(index, 1);
         continue;
       }
@@ -252,6 +280,7 @@ export class GameSimulation {
       if (victim) {
         victim.alive = false;
         this.spawnParticles(victim.x, victim.y, true);
+        this.events.push({ type: 'entity-killed', x: victim.x, y: victim.y, victimId: victim.id, byPlayer: projectile.ownerId === this.player.id });
         this.projectiles.splice(index, 1);
       }
     }
@@ -304,6 +333,7 @@ export class GameSimulation {
       ownerId: shooter.id,
       trail: []
     });
+    this.events.push({ type: 'beam-fired', x: shooter.x, y: shooter.y, ownerId: shooter.id, isPlayer: shooter.isPlayer });
   }
 
   private spawnParticles(x: number, y: number, isKill: boolean): void {

@@ -5,6 +5,15 @@ import { MAP_DATA, MAP_HEIGHT, MAP_WIDTH, MAP_COLS, MAP_ROWS, TILE_SIZE, TileKin
 import { buildWallSegments, Raycaster } from '../../game/simulation/raycast';
 import type { Entity, InputActionState, LightSource } from '../../game/simulation/types';
 
+type ImpactRipple = {
+  x: number;
+  y: number;
+  ageMs: number;
+  durationMs: number;
+  color: number;
+  maxRadius: number;
+};
+
 type HudRefs = {
   root: HTMLDivElement;
   title: HTMLDivElement;
@@ -32,6 +41,7 @@ export class GameScene extends Phaser.Scene {
   private entityLayer!: Phaser.GameObjects.Graphics;
   private projectileLayer!: Phaser.GameObjects.Graphics;
   private particleLayer!: Phaser.GameObjects.Graphics;
+  private feedbackLayer!: Phaser.GameObjects.Graphics;
   private debugLayer!: Phaser.GameObjects.Graphics;
   private minimapLayer!: Phaser.GameObjects.Graphics;
   private darkness!: Phaser.GameObjects.RenderTexture;
@@ -42,6 +52,7 @@ export class GameScene extends Phaser.Scene {
   private debugEnabled = false;
   private pointerWasDown = false;
   private debugKeyWasDown = false;
+  private impactRipples: ImpactRipple[] = [];
 
   constructor() {
     super('GameScene');
@@ -63,7 +74,9 @@ export class GameScene extends Phaser.Scene {
 
     const actions = this.readActions();
     this.simulation.update(deltaMs, actions);
+    this.handleGameplayEvents();
     this.updateDebugToggle();
+    this.updateImpactRipples(deltaMs);
 
     this.updateCamera(deltaMs / 1000);
     this.renderLights();
@@ -71,6 +84,7 @@ export class GameScene extends Phaser.Scene {
     this.renderEntities();
     this.renderProjectiles();
     this.renderParticles();
+    this.renderFeedback();
     this.renderDarkness();
     this.renderDebug();
     this.renderMinimap();
@@ -154,6 +168,7 @@ export class GameScene extends Phaser.Scene {
     this.entityLayer = this.add.graphics().setDepth(6);
     this.projectileLayer = this.add.graphics().setDepth(7);
     this.particleLayer = this.add.graphics().setDepth(8);
+    this.feedbackLayer = this.add.graphics().setDepth(9);
     this.darkness = this.add.renderTexture(0, 0, this.scale.width, this.scale.height).setOrigin(0, 0).setScrollFactor(0).setDepth(20);
     this.eraseLayer = this.add.graphics().setVisible(false);
     this.dawnOverlay = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x1f0900, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(21);
@@ -328,7 +343,7 @@ export class GameScene extends Phaser.Scene {
       const inLight = Boolean(entity.shadow);
       const color = entity.isPlayer ? 0x80b4ff : 0xe06040;
       const alpha = entity.isPlayer ? (inLight ? 0.56 : 0.22) : inLight ? 0.5 : 0.04;
-      g.fillStyle(color, alpha).fillCircle(entity.x, entity.y, PLAYER_RADIUS);
+      this.drawEntitySilhouette(g, entity, color, alpha);
 
       if (entity.isPlayer) {
         if (this.simulation.isPlayerProtected()) {
@@ -338,6 +353,27 @@ export class GameScene extends Phaser.Scene {
         this.drawAim(g, entity);
       }
     }
+  }
+
+  private drawEntitySilhouette(g: Phaser.GameObjects.Graphics, entity: Entity, color: number, alpha: number): void {
+    const noseX = Math.cos(entity.angle) * 12;
+    const noseY = Math.sin(entity.angle) * 12;
+    const sideX = Math.cos(entity.angle + Math.PI / 2) * 7;
+    const sideY = Math.sin(entity.angle + Math.PI / 2) * 7;
+
+    g.fillStyle(color, alpha * 0.42);
+    g.fillCircle(entity.x, entity.y, PLAYER_RADIUS + 5);
+    g.fillStyle(color, alpha);
+    g.fillTriangle(
+      entity.x + noseX,
+      entity.y + noseY,
+      entity.x - noseX * 0.55 + sideX,
+      entity.y - noseY * 0.55 + sideY,
+      entity.x - noseX * 0.55 - sideX,
+      entity.y - noseY * 0.55 - sideY
+    );
+    g.fillStyle(0xffffff, entity.isPlayer ? alpha * 0.36 : alpha * 0.18);
+    g.fillCircle(entity.x + noseX * 0.35, entity.y + noseY * 0.35, 2);
   }
 
   private drawAim(g: Phaser.GameObjects.Graphics, entity: Entity): void {
@@ -373,6 +409,44 @@ export class GameScene extends Phaser.Scene {
     const g = this.particleLayer.clear();
     for (const particle of this.simulation.particles) {
       g.fillStyle(particle.color, particle.life * 0.9).fillCircle(particle.x, particle.y, particle.radius);
+    }
+  }
+
+  private handleGameplayEvents(): void {
+    for (const event of this.simulation.consumeEvents()) {
+      if (event.type === 'beam-fired') {
+        if (event.isPlayer) this.cameras.main.shake(55, 0.0016);
+        this.impactRipples.push({ x: event.x, y: event.y, ageMs: 0, durationMs: 180, color: 0x90c8ff, maxRadius: 26 });
+      }
+
+      if (event.type === 'beam-impact') {
+        this.impactRipples.push({ x: event.x, y: event.y, ageMs: 0, durationMs: 240, color: 0x90c8ff, maxRadius: 34 });
+      }
+
+      if (event.type === 'entity-killed') {
+        this.cameras.main.shake(event.byPlayer ? 170 : 230, event.byPlayer ? 0.004 : 0.006);
+        this.impactRipples.push({ x: event.x, y: event.y, ageMs: 0, durationMs: 520, color: event.byPlayer ? 0xd4a843 : 0xe06040, maxRadius: 72 });
+      }
+    }
+  }
+
+  private updateImpactRipples(deltaMs: number): void {
+    for (let index = this.impactRipples.length - 1; index >= 0; index -= 1) {
+      this.impactRipples[index].ageMs += deltaMs;
+      if (this.impactRipples[index].ageMs >= this.impactRipples[index].durationMs) this.impactRipples.splice(index, 1);
+    }
+  }
+
+  private renderFeedback(): void {
+    const g = this.feedbackLayer.clear();
+    for (const ripple of this.impactRipples) {
+      const t = ripple.ageMs / ripple.durationMs;
+      const radius = 4 + ripple.maxRadius * t;
+      const alpha = Math.max(0, 1 - t);
+      g.lineStyle(2, ripple.color, alpha * 0.85);
+      g.strokeCircle(ripple.x, ripple.y, radius);
+      g.lineStyle(1, ripple.color, alpha * 0.38);
+      g.strokeCircle(ripple.x, ripple.y, radius * 0.62);
     }
   }
 
@@ -557,6 +631,7 @@ export class GameScene extends Phaser.Scene {
     if (this.debugEnabled) {
       const shadowedBots = this.simulation.bots.filter((bot) => bot.alive && bot.shadow).length;
       const huntingBots = this.simulation.bots.filter((bot) => bot.alive && bot.aiState === 'hunt').length;
+      const investigatingBots = this.simulation.bots.filter((bot) => bot.alive && bot.aiState === 'investigate').length;
       this.hud.debug.innerHTML = [
         `FPS ${Math.round(this.game.loop.actualFps)}`,
         `STATE ${this.simulation.outcome}`,
@@ -571,6 +646,7 @@ export class GameScene extends Phaser.Scene {
         `EXPOSED ${this.simulation.player.shadow ? 'YES' : 'NO'}`,
         `BOTS SHADOWED ${shadowedBots}`,
         `BOTS HUNTING ${huntingBots}`,
+        `BOTS INVESTIGATING ${investigatingBots}`,
         `BEAMS ${this.simulation.projectiles.length}`,
         `PARTICLES ${this.simulation.particles.length}`
       ].join('<br>');

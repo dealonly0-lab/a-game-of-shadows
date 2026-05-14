@@ -39,9 +39,12 @@ export type Entity = {
 
 export type BotEntity = Entity & {
   isPlayer: false;
-  aiState: 'idle' | 'wander' | 'hunt';
+  aiState: 'idle' | 'wander' | 'investigate' | 'hunt';
   wanderAngle: number;
   wanderMs: number;
+  memoryMs: number;
+  lastKnownTargetX: number;
+  lastKnownTargetY: number;
 };
 
 export type Projectile = {
@@ -76,3 +79,8 @@ export type InputActionState = {
 
 export type GameOutcome = 'playing' | 'won' | 'lost';
 export type MatchPhase = 'countdown' | 'active' | 'ended';
+
+export type GameplayEvent =
+  | { type: 'beam-fired'; x: number; y: number; ownerId: string; isPlayer: boolean }
+  | { type: 'beam-impact'; x: number; y: number }
+  | { type: 'entity-killed'; x: number; y: number; victimId: string; byPlayer: boolean };
