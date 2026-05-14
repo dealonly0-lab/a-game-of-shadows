@@ -4,6 +4,7 @@ import { GameSimulation } from '../../game/simulation/GameSimulation';
 import { MAP_DATA, MAP_HEIGHT, MAP_WIDTH, MAP_COLS, MAP_ROWS, TILE_SIZE, TileKind, isWallTile } from '../../game/content/villageMap';
 import { buildWallSegments, Raycaster } from '../../game/simulation/raycast';
 import type { Entity, InputActionState, LightSource } from '../../game/simulation/types';
+import { GameAudio } from '../audio/GameAudio';
 
 type ImpactRipple = {
   x: number;
@@ -32,6 +33,7 @@ type HudRefs = {
 export class GameScene extends Phaser.Scene {
   private simulation!: GameSimulation;
   private raycaster!: Raycaster;
+  private audio!: GameAudio;
   private hud!: HudRefs;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
 
@@ -53,6 +55,8 @@ export class GameScene extends Phaser.Scene {
   private pointerWasDown = false;
   private debugKeyWasDown = false;
   private impactRipples: ImpactRipple[] = [];
+  private lastCountdownSecond = 0;
+  private lastExposedPulseMs = 0;
 
   constructor() {
     super('GameScene');
@@ -61,6 +65,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.simulation = new GameSimulation();
     this.raycaster = new Raycaster(buildWallSegments(isWallTile, MAP_COLS, MAP_ROWS, TILE_SIZE));
+    this.audio = new GameAudio();
 
     this.createHud();
     this.createRenderLayers();
@@ -137,6 +142,7 @@ export class GameScene extends Phaser.Scene {
     document.body.append(hud, title, gameOver);
 
     title.querySelector<HTMLButtonElement>('#start-button')?.addEventListener('click', () => {
+      void this.audio.unlock();
       title.classList.add('is-hidden');
       this.isStarted = true;
     });
@@ -203,6 +209,9 @@ export class GameScene extends Phaser.Scene {
     this.simulation = new GameSimulation();
     this.hud.gameOver.classList.add('is-hidden');
     this.isStarted = true;
+    this.lastCountdownSecond = 0;
+    this.lastExposedPulseMs = 0;
+    void this.audio.unlock();
     this.configureCamera();
   }
 
@@ -415,15 +424,18 @@ export class GameScene extends Phaser.Scene {
   private handleGameplayEvents(): void {
     for (const event of this.simulation.consumeEvents()) {
       if (event.type === 'beam-fired') {
+        this.audio.playBeam(event.isPlayer);
         if (event.isPlayer) this.cameras.main.shake(55, 0.0016);
         this.impactRipples.push({ x: event.x, y: event.y, ageMs: 0, durationMs: 180, color: 0x90c8ff, maxRadius: 26 });
       }
 
       if (event.type === 'beam-impact') {
+        this.audio.playImpact();
         this.impactRipples.push({ x: event.x, y: event.y, ageMs: 0, durationMs: 240, color: 0x90c8ff, maxRadius: 34 });
       }
 
       if (event.type === 'entity-killed') {
+        this.audio.playKill(event.byPlayer);
         this.cameras.main.shake(event.byPlayer ? 170 : 230, event.byPlayer ? 0.004 : 0.006);
         this.impactRipples.push({ x: event.x, y: event.y, ageMs: 0, durationMs: 520, color: event.byPlayer ? 0xd4a843 : 0xe06040, maxRadius: 72 });
       }
@@ -592,9 +604,17 @@ export class GameScene extends Phaser.Scene {
 
     if (this.simulation.matchPhase === 'countdown') {
       const count = Math.max(1, Math.ceil(this.simulation.countdownMs / 1000));
+      if (count !== this.lastCountdownSecond) {
+        this.audio.playCountdownTick();
+        this.lastCountdownSecond = count;
+      }
       this.hud.status.textContent = `MATCH STARTS IN ${count}`;
       this.hud.status.classList.remove('is-hidden');
     } else if (this.simulation.isPlayerProtected()) {
+      if (this.lastCountdownSecond !== -1) {
+        this.audio.playRoundStart();
+        this.lastCountdownSecond = -1;
+      }
       const shield = Math.ceil(this.simulation.playerSpawnGraceMs / 1000);
       this.hud.status.textContent = `SHADOW VEIL ${shield}`;
       this.hud.status.classList.remove('is-hidden');
@@ -650,6 +670,12 @@ export class GameScene extends Phaser.Scene {
         `BEAMS ${this.simulation.projectiles.length}`,
         `PARTICLES ${this.simulation.particles.length}`
       ].join('<br>');
+    }
+
+    const danger = this.simulation.getPlayerDangerLevel();
+    if (danger > 0.15 && this.simulation.matchElapsedMs - this.lastExposedPulseMs > 520) {
+      this.audio.playExposedPulse(danger);
+      this.lastExposedPulseMs = this.simulation.matchElapsedMs;
     }
   }
 

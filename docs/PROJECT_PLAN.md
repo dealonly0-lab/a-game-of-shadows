@@ -212,6 +212,7 @@ Tasks:
 - Add sound effects.
 - Add ambient haunted village loop.
 - Add screen shake and hit-stop for kills.
+- Add first-pass procedural audio for core feedback.
 - Add stronger light beam animation.
 - Add better shadow shapes.
 - Add player/bot silhouettes or sprite placeholders.

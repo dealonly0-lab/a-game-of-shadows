@@ -90,4 +90,6 @@ Progress:
 - Player and bot dots replaced with directional silhouettes.
 - Fixed map generation order so roads no longer carve visual tunnels through building blocks.
 - Spawn positions now resolve to the nearest valid open tile if authored spawn data lands inside collision.
+- First procedural audio system added using Web Audio.
+- Countdown, round start, beam fire, beam impact, kills, exposure warning, and ambience now have sound.
 - Build passes after these changes.
