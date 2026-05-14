@@ -9,7 +9,7 @@ import {
   PLAYER_SPEED
 } from './constants';
 import type { BotEntity, Entity, GameOutcome, InputActionState, LightSource, Particle, Projectile } from './types';
-import { BOT_SPAWNS, LIGHT_DEFS, MAP_COLS, MAP_ROWS, TILE_SIZE, isWallTile } from '../content/villageMap';
+import { BOT_SPAWNS, LIGHT_DEFS, MAP_COLS, MAP_ROWS, PLAYER_SPAWN, TILE_SIZE, isWallTile } from '../content/villageMap';
 
 export class GameSimulation {
   readonly player: Entity;
@@ -30,8 +30,8 @@ export class GameSimulation {
   constructor() {
     this.player = {
       id: 'player',
-      x: TILE_SIZE * 2.5,
-      y: TILE_SIZE * 6.5,
+      x: (PLAYER_SPAWN.col + 0.5) * TILE_SIZE,
+      y: (PLAYER_SPAWN.row + 0.5) * TILE_SIZE,
       angle: 0,
       alive: true,
       isPlayer: true,

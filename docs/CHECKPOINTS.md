@@ -78,4 +78,6 @@ Progress:
 - HUD shows exposed state.
 - First tuning pass completed for movement, beam, bot speed, and dawn duration.
 - Bot target selection now requires line-of-sight instead of seeing exposed targets through walls.
+- Prototype map expanded from a small test board into a larger 64x36 haunted village.
+- Player spawn moved away from the edge so the camera starts inside the world instead of making the game feel side-aligned.
 - Build passes after these changes.
