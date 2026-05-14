@@ -1,4 +1,5 @@
 import type { GameOutcome, MatchStats } from '../simulation/types';
+import { getShadowSkin } from './cosmetics';
 
 export type PlayerProfile = {
   version: 1;
@@ -14,6 +15,8 @@ export type PlayerProfile = {
   bestSurvivalMs: number;
   title: string;
   contracts: DailyContract[];
+  ownedShadowSkins: string[];
+  equippedShadowSkin: string;
 };
 
 export type ContractKind = 'matches' | 'kills' | 'hits' | 'survive' | 'wins';
@@ -60,7 +63,9 @@ export function createDefaultProfile(): PlayerProfile {
     bestKills: 0,
     bestSurvivalMs: 0,
     title: 'New Shadow',
-    contracts: generateDailyContracts(dayStamp())
+    contracts: generateDailyContracts(dayStamp()),
+    ownedShadowSkins: ['blue-veil'],
+    equippedShadowSkin: 'blue-veil'
   };
 }
 
@@ -202,8 +207,21 @@ function normalizeProfile(profile: Partial<PlayerProfile>): PlayerProfile {
     bestKills: positiveNumber(profile.bestKills, fallback.bestKills),
     bestSurvivalMs: positiveNumber(profile.bestSurvivalMs, fallback.bestSurvivalMs),
     title: typeof profile.title === 'string' ? profile.title : fallback.title,
-    contracts
+    contracts,
+    ownedShadowSkins: normalizeOwnedSkins(profile.ownedShadowSkins),
+    equippedShadowSkin: normalizeEquippedSkin(profile.equippedShadowSkin, profile.ownedShadowSkins)
   };
+}
+
+function normalizeOwnedSkins(value: unknown): string[] {
+  const owned = Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+  const unique = Array.from(new Set(['blue-veil', ...owned]));
+  return unique.filter((id) => getShadowSkin(id).id === id);
+}
+
+function normalizeEquippedSkin(value: unknown, ownedValue: unknown): string {
+  const owned = normalizeOwnedSkins(ownedValue);
+  return typeof value === 'string' && owned.includes(value) ? value : 'blue-veil';
 }
 
 function normalizeContract(contract: Partial<DailyContract>): DailyContract {

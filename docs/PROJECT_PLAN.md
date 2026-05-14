@@ -48,6 +48,9 @@ src/
       villageMap.ts
     input/
       actions.ts
+    progression/
+      cosmetics.ts
+      profile.ts
     simulation/
       constants.ts
       GameSimulation.ts
@@ -138,6 +141,19 @@ Owns:
 Main file:
 
 - `src/styles.css`
+
+### 6. Progression And Content
+
+Owns:
+
+- local player profile
+- XP, Embers, daily contracts, and streaks
+- cosmetic catalog and equipped shadow skin
+
+Main files:
+
+- `src/game/progression/profile.ts`
+- `src/game/progression/cosmetics.ts`
 
 ## Milestone Plan
 
@@ -266,6 +282,7 @@ Tasks:
 - Add daily contracts and streak bonuses to give each session clear goals.
 - Add cosmetic shadow skins.
 - Add unlockable cosmetics.
+- Add home-hub cosmetic list with local unlock/equip actions using Embers.
 - Add match stats.
 - Add pause and resume flow.
 - Add leaderboard stub.

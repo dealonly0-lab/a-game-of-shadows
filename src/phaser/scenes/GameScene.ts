@@ -5,6 +5,7 @@ import { TILE_SIZE, TileKind } from '../../game/content/villageMap';
 import { buildWallSegments, Raycaster } from '../../game/simulation/raycast';
 import type { Entity, InputActionState, LightSource } from '../../game/simulation/types';
 import { applyMatchRewards, loadProfile, saveProfile, type MatchRewards, type PlayerProfile, xpProgressInLevel } from '../../game/progression/profile';
+import { getShadowSkin, SHADOW_SKINS } from '../../game/progression/cosmetics';
 import { GameAudio } from '../audio/GameAudio';
 
 type ImpactRipple = {
@@ -27,6 +28,7 @@ type HudRefs = {
   title: HTMLDivElement;
   titleProfile: HTMLDivElement;
   titleMap: HTMLDivElement;
+  titleCosmetics: HTMLDivElement;
   titleLevel: HTMLElement;
   titleThreat: HTMLElement;
   gameOver: HTMLDivElement;
@@ -191,6 +193,13 @@ export class GameScene extends Phaser.Scene {
           </div>
           <div id="title-map" class="map-card"></div>
         </aside>
+        <aside class="home-panel home-panel--cosmetics">
+          <div class="home-panel__header">
+            <span>Shadow Forms</span>
+            <strong>Embers</strong>
+          </div>
+          <div id="title-cosmetics" class="cosmetic-list"></div>
+        </aside>
       </div>
     `;
 
@@ -226,6 +235,9 @@ export class GameScene extends Phaser.Scene {
       title.classList.add('is-hidden');
       this.isStarted = true;
     });
+    title.querySelector<HTMLDivElement>('#title-cosmetics')?.addEventListener('click', (event) => {
+      this.handleCosmeticClick(event);
+    });
 
     gameOver.querySelector<HTMLButtonElement>('#restart-button')?.addEventListener('click', () => {
       this.restartRound();
@@ -246,6 +258,7 @@ export class GameScene extends Phaser.Scene {
       title,
       titleProfile: title.querySelector<HTMLDivElement>('#title-profile')!,
       titleMap: title.querySelector<HTMLDivElement>('#title-map')!,
+      titleCosmetics: title.querySelector<HTMLDivElement>('#title-cosmetics')!,
       titleLevel: title.querySelector<HTMLElement>('#home-level')!,
       titleThreat: title.querySelector<HTMLElement>('#home-threat')!,
       gameOver,
@@ -265,6 +278,7 @@ export class GameScene extends Phaser.Scene {
     };
     this.renderProfileCard();
     this.renderHomeMapCard();
+    this.renderCosmetics();
   }
 
   private createRenderLayers(): void {
@@ -343,6 +357,7 @@ export class GameScene extends Phaser.Scene {
     this.configureCamera();
     this.renderProfileCard();
     this.renderHomeMapCard();
+    this.renderCosmetics();
   }
 
   private createSimulation(): GameSimulation {
@@ -387,6 +402,53 @@ export class GameScene extends Phaser.Scene {
         `).join('')}
       </div>
     `;
+  }
+
+  private renderCosmetics(): void {
+    this.hud.titleCosmetics.innerHTML = SHADOW_SKINS.map((skin) => {
+      const owned = this.profile.ownedShadowSkins.includes(skin.id);
+      const equipped = this.profile.equippedShadowSkin === skin.id;
+      const affordable = this.profile.embers >= skin.cost;
+      const action = owned ? 'equip' : 'unlock';
+      const label = equipped ? 'Equipped' : owned ? 'Equip' : `${skin.cost} Embers`;
+      return `
+        <button class="cosmetic-item ${equipped ? 'is-equipped' : ''}" type="button" data-action="${action}" data-skin="${skin.id}" ${equipped || (!owned && !affordable) ? 'disabled' : ''}>
+          <span class="cosmetic-item__swatch" style="--skin-color: #${skin.color.toString(16).padStart(6, '0')}; --skin-accent: #${skin.accent.toString(16).padStart(6, '0')}"></span>
+          <span class="cosmetic-item__body">
+            <strong>${skin.name}</strong>
+            <span>${skin.rarity} - ${skin.description}</span>
+          </span>
+          <span class="cosmetic-item__action">${label}</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  private handleCosmeticClick(event: Event): void {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.cosmetic-item');
+    if (!button || button.disabled) return;
+
+    const skinId = button.dataset.skin;
+    const action = button.dataset.action;
+    if (!skinId) return;
+
+    const skin = getShadowSkin(skinId);
+    if (action === 'unlock') {
+      if (this.profile.ownedShadowSkins.includes(skin.id) || this.profile.embers < skin.cost) return;
+      this.profile = {
+        ...this.profile,
+        embers: this.profile.embers - skin.cost,
+        ownedShadowSkins: [...this.profile.ownedShadowSkins, skin.id],
+        equippedShadowSkin: skin.id
+      };
+    } else if (action === 'equip') {
+      if (!this.profile.ownedShadowSkins.includes(skin.id)) return;
+      this.profile = { ...this.profile, equippedShadowSkin: skin.id };
+    }
+
+    saveProfile(this.profile);
+    this.renderProfileCard();
+    this.renderCosmetics();
   }
 
   private renderHomeMapCard(): void {
@@ -596,7 +658,8 @@ export class GameScene extends Phaser.Scene {
       const py = s.nx;
       const endX = entity.x + s.nx * s.length;
       const endY = entity.y + s.ny * s.length;
-      const color = entity.isPlayer ? 0x4a8adc : 0xcc5028;
+      const skin = getShadowSkin(this.profile.equippedShadowSkin);
+      const color = entity.isPlayer ? skin.color : 0xcc5028;
 
       g.fillStyle(color, opacity);
       g.fillTriangle(entity.x + px * 11, entity.y + py * 11, entity.x - px * 11, entity.y - py * 11, endX, endY);
@@ -612,7 +675,8 @@ export class GameScene extends Phaser.Scene {
       if (!entity.alive) continue;
 
       const inLight = Boolean(entity.shadow);
-      const color = entity.isPlayer ? 0x80b4ff : 0xe06040;
+      const skin = getShadowSkin(this.profile.equippedShadowSkin);
+      const color = entity.isPlayer ? skin.accent : 0xe06040;
       const alpha = entity.isPlayer ? (inLight ? 0.56 : 0.22) : inLight ? 0.5 : 0.04;
       this.drawEntitySilhouette(g, entity, color, alpha);
 

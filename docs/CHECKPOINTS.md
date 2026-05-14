@@ -109,4 +109,7 @@ Progress:
 - Next-hunt panel now includes a larger map-preview surface for stronger game-menu presentation.
 - Medium-width home layout fixed so panels stack before they overlap the hero.
 - Wall tiles now render as first-pass haunted house blocks with roof edges, windows, side shadows, and occasional chimneys.
+- Shadow skin catalog added with starter, rare, and epic cosmetics.
+- Home hub now supports unlocking and equipping shadow skins with Embers.
+- Equipped skin changes the player's shadow and silhouette color in matches.
 - Build passes after these changes.
