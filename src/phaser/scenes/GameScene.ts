@@ -5,7 +5,7 @@ import { TILE_SIZE, TileKind } from '../../game/content/villageMap';
 import { buildWallSegments, Raycaster } from '../../game/simulation/raycast';
 import type { Entity, InputActionState, LightSource } from '../../game/simulation/types';
 import { applyMatchRewards, loadProfile, saveProfile, type MatchRewards, type PlayerProfile, xpProgressInLevel } from '../../game/progression/profile';
-import { getShadowSkin, SHADOW_SKINS } from '../../game/progression/cosmetics';
+import { canUnlockSkin, getShadowSkin, getSkinUnlockReasons, SHADOW_SKINS } from '../../game/progression/cosmetics';
 import { GameAudio } from '../audio/GameAudio';
 
 type ImpactRipple = {
@@ -411,14 +411,19 @@ export class GameScene extends Phaser.Scene {
       const owned = this.profile.ownedShadowSkins.includes(skin.id);
       const equipped = this.profile.equippedShadowSkin === skin.id;
       const affordable = this.profile.embers >= skin.cost;
+      const unlockReasons = getSkinUnlockReasons(skin, this.profile);
+      const gated = unlockReasons.length > 0;
       const action = owned ? 'equip' : 'unlock';
-      const label = equipped ? 'Equipped' : owned ? 'Equip' : `${skin.cost} Embers`;
+      const label = equipped ? 'Equipped' : owned ? 'Equip' : gated ? unlockReasons[0] : `${skin.cost} Embers`;
+      const detail = gated
+        ? `locked - ${unlockReasons.join(', ')} - ${skin.cost} embers`
+        : `${skin.rarity} - ${skin.description}`;
       return `
-        <button class="cosmetic-item ${equipped ? 'is-equipped' : ''}" type="button" data-action="${action}" data-skin="${skin.id}" ${equipped || (!owned && !affordable) ? 'disabled' : ''}>
+        <button class="cosmetic-item ${equipped ? 'is-equipped' : ''} ${gated && !owned ? 'is-locked' : ''}" type="button" data-action="${action}" data-skin="${skin.id}" ${equipped || (!owned && (!affordable || gated)) ? 'disabled' : ''}>
           <span class="cosmetic-item__swatch" style="--skin-color: #${skin.color.toString(16).padStart(6, '0')}; --skin-accent: #${skin.accent.toString(16).padStart(6, '0')}"></span>
           <span class="cosmetic-item__body">
             <strong>${skin.name}</strong>
-            <span>${skin.rarity} - ${skin.description}</span>
+            <span>${detail}</span>
           </span>
           <span class="cosmetic-item__action">${label}</span>
         </button>
@@ -436,7 +441,7 @@ export class GameScene extends Phaser.Scene {
 
     const skin = getShadowSkin(skinId);
     if (action === 'unlock') {
-      if (this.profile.ownedShadowSkins.includes(skin.id) || this.profile.embers < skin.cost) return;
+      if (this.profile.ownedShadowSkins.includes(skin.id) || this.profile.embers < skin.cost || !canUnlockSkin(skin, this.profile)) return;
       this.profile = {
         ...this.profile,
         embers: this.profile.embers - skin.cost,

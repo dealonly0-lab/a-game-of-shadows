@@ -467,6 +467,11 @@ body {
   background: rgba(212, 168, 67, 0.08);
 }
 
+.cosmetic-item.is-locked {
+  border-color: rgba(120, 90, 120, 0.26);
+  background: rgba(20, 10, 26, 0.44);
+}
+
 .cosmetic-item:disabled {
   cursor: default;
   opacity: 0.62;
@@ -506,6 +511,15 @@ body {
   letter-spacing: 2px;
   text-transform: uppercase;
   white-space: nowrap;
+  text-align: right;
+}
+
+.cosmetic-item.is-locked .cosmetic-item__action {
+  color: rgba(220, 120, 90, 0.82);
+}
+
+.cosmetic-item.is-locked .cosmetic-item__swatch {
+  filter: grayscale(0.65) brightness(0.65);
 }
 
 .map-card {

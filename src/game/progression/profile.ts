@@ -1,8 +1,10 @@
 import type { GameOutcome, MatchStats } from '../simulation/types';
 import { getShadowSkin } from './cosmetics';
 
+const PROFILE_VERSION = 2;
+
 export type PlayerProfile = {
-  version: 1;
+  version: 2;
   level: number;
   xp: number;
   embers: number;
@@ -12,6 +14,7 @@ export type PlayerProfile = {
   wins: number;
   totalKills: number;
   bestKills: number;
+  contractsCompleted: number;
   bestSurvivalMs: number;
   title: string;
   contracts: DailyContract[];
@@ -51,7 +54,7 @@ const STORAGE_KEY = 'hollow.profile.v1';
 
 export function createDefaultProfile(): PlayerProfile {
   return {
-    version: 1,
+    version: PROFILE_VERSION,
     level: 1,
     xp: 0,
     embers: 0,
@@ -61,6 +64,7 @@ export function createDefaultProfile(): PlayerProfile {
     wins: 0,
     totalKills: 0,
     bestKills: 0,
+    contractsCompleted: 0,
     bestSurvivalMs: 0,
     title: 'New Shadow',
     contracts: generateDailyContracts(dayStamp()),
@@ -91,12 +95,12 @@ export function applyMatchRewards(profile: PlayerProfile, stats: MatchStats, out
   const completedContracts: string[] = [];
 
   const survivedSeconds = Math.round(stats.survivedMs / 1000);
-  const survivalXp = Math.min(120, Math.floor(survivedSeconds * 1.4));
-  const killXp = stats.playerKills * 75;
+  const survivalXp = Math.min(55, Math.floor(survivedSeconds * 0.55));
+  const killXp = stats.playerKills * 32;
   const accuracy = stats.playerShots > 0 ? stats.playerHits / stats.playerShots : 0;
-  const accuracyXp = stats.playerShots >= 3 ? Math.round(accuracy * 35) : 0;
-  const winXp = outcome === 'won' ? 160 : 0;
-  const baseXp = 20 + survivalXp + killXp + accuracyXp + winXp;
+  const accuracyXp = stats.playerShots >= 4 ? Math.round(accuracy * 16) : 0;
+  const winXp = outcome === 'won' ? 75 : 0;
+  const baseXp = 10 + survivalXp + killXp + accuracyXp + winXp;
   let contractXp = 0;
   let contractEmbers = 0;
 
@@ -114,16 +118,22 @@ export function applyMatchRewards(profile: PlayerProfile, stats: MatchStats, out
       contract.claimed = true;
       contractXp += contract.xpReward;
       contractEmbers += contract.emberReward;
+      next.contractsCompleted += 1;
       completedContracts.push(contract.label);
       reasons.push(`Contract: ${contract.label}`);
     }
   }
 
-  const streakBonus = next.streak >= 2 ? Math.min(60, next.streak * 6) : 0;
+  const streakBonus = next.streak >= 2 ? Math.min(25, next.streak * 3) : 0;
   if (streakBonus > 0) reasons.push(`Streak +${streakBonus} XP`);
 
   const xp = baseXp + contractXp + streakBonus;
-  const embers = Math.max(5, Math.round(baseXp / 18) + stats.playerKills * 4 + (outcome === 'won' ? 12 : 0)) + contractEmbers;
+  const survivalEmbers = Math.min(8, Math.floor(survivedSeconds / 18));
+  const killEmbers = stats.playerKills * 2;
+  const accuracyEmbers = stats.playerShots >= 4 && accuracy >= 0.5 ? 2 : 0;
+  const winEmbers = outcome === 'won' ? 8 : 0;
+  const baseEmbers = Math.max(3, Math.min(22, 3 + survivalEmbers + killEmbers + accuracyEmbers + winEmbers));
+  const embers = Math.min(35, baseEmbers + contractEmbers);
 
   next.xp += xp;
   next.embers += embers;
@@ -190,12 +200,15 @@ function titleForLevel(level: number): string {
 function normalizeProfile(profile: Partial<PlayerProfile>): PlayerProfile {
   const fallback = createDefaultProfile();
   const today = dayStamp();
+  const isLegacyEconomy = profile.version !== PROFILE_VERSION;
   const contracts = Array.isArray(profile.contracts) && profile.contracts.some((contract) => contract.day === today)
     ? profile.contracts.filter((contract) => contract.day === today).map(normalizeContract)
     : generateDailyContracts(today);
+  const ownedShadowSkins = isLegacyEconomy ? fallback.ownedShadowSkins : normalizeOwnedSkins(profile.ownedShadowSkins);
+  const equippedShadowSkin = isLegacyEconomy ? fallback.equippedShadowSkin : normalizeEquippedSkin(profile.equippedShadowSkin, ownedShadowSkins);
 
   return {
-    version: 1,
+    version: PROFILE_VERSION,
     level: positiveNumber(profile.level, fallback.level),
     xp: positiveNumber(profile.xp, fallback.xp),
     embers: positiveNumber(profile.embers, fallback.embers),
@@ -205,11 +218,12 @@ function normalizeProfile(profile: Partial<PlayerProfile>): PlayerProfile {
     wins: positiveNumber(profile.wins, fallback.wins),
     totalKills: positiveNumber(profile.totalKills, fallback.totalKills),
     bestKills: positiveNumber(profile.bestKills, fallback.bestKills),
+    contractsCompleted: positiveNumber(profile.contractsCompleted, fallback.contractsCompleted),
     bestSurvivalMs: positiveNumber(profile.bestSurvivalMs, fallback.bestSurvivalMs),
     title: typeof profile.title === 'string' ? profile.title : fallback.title,
     contracts,
-    ownedShadowSkins: normalizeOwnedSkins(profile.ownedShadowSkins),
-    equippedShadowSkin: normalizeEquippedSkin(profile.equippedShadowSkin, profile.ownedShadowSkins)
+    ownedShadowSkins,
+    equippedShadowSkin
   };
 }
 
@@ -244,12 +258,12 @@ function normalizeContract(contract: Partial<DailyContract>): DailyContract {
 
 function generateDailyContracts(day: string): DailyContract[] {
   const pool: Omit<DailyContract, 'id' | 'day' | 'progress' | 'completed' | 'claimed'>[] = [
-    { kind: 'matches', label: 'Enter 2 Hunts', target: 2, xpReward: 90, emberReward: 8 },
-    { kind: 'kills', label: 'Banish 2 Shadows', target: 2, xpReward: 120, emberReward: 12 },
-    { kind: 'hits', label: 'Land 4 Beams', target: 4, xpReward: 110, emberReward: 10 },
-    { kind: 'survive', label: 'Survive 90 Seconds', target: 90, xpReward: 130, emberReward: 12 },
-    { kind: 'wins', label: 'Claim the Village', target: 1, xpReward: 180, emberReward: 18 },
-    { kind: 'kills', label: 'Banish 4 Shadows', target: 4, xpReward: 170, emberReward: 16 }
+    { kind: 'matches', label: 'Enter 2 Hunts', target: 2, xpReward: 35, emberReward: 2 },
+    { kind: 'kills', label: 'Banish 2 Shadows', target: 2, xpReward: 50, emberReward: 3 },
+    { kind: 'hits', label: 'Land 4 Beams', target: 4, xpReward: 45, emberReward: 3 },
+    { kind: 'survive', label: 'Survive 90 Seconds', target: 90, xpReward: 55, emberReward: 4 },
+    { kind: 'wins', label: 'Claim the Village', target: 1, xpReward: 70, emberReward: 5 },
+    { kind: 'kills', label: 'Banish 4 Shadows', target: 4, xpReward: 65, emberReward: 5 }
   ];
   let seed = hashDay(day);
   const contracts: DailyContract[] = [];

@@ -313,6 +313,8 @@ This is the near-term plan we follow next. The goal is to stop players from buyi
 
 ### Step 1: Economy Rebalance
 
+Status: in progress
+
 Problem:
 
 - Current rewards are too high.
@@ -341,6 +343,14 @@ Exit check:
 - A player cannot buy all cosmetics after a few matches.
 - A new player has one obvious first unlock goal.
 - Epic cosmetics feel aspirational.
+
+Checkpoint 2026-05-17:
+
+- Match XP and Ember payout were reduced.
+- Daily contracts now pay smaller Ember amounts.
+- Cosmetic prices were raised into rare and epic target ranges.
+- Shadow skins now support level, win, kill, best-kill, and contract gates.
+- Prototype save data migrates to the new economy version and resets old cosmetic ownership to the starter skin.
 
 ### Step 2: Content Inventory Expansion
 
