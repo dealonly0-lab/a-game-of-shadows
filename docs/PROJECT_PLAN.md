@@ -418,6 +418,8 @@ Exit check:
 
 ### Step 4: Gameplay Content Depth
 
+Status: in progress
+
 Goal:
 
 - Matches should differ beyond spawn points and light radius.
@@ -440,6 +442,13 @@ Exit check:
 
 - A match has at least one memorable modifier or hazard.
 - Bots feel behaviorally different, not just faster/slower.
+
+Checkpoint 2026-05-17:
+
+- Added four map scales: Chapel Square, Old Village, Moon Cemetery, and Grave Market.
+- MatchDirector now chooses maps by progression stage instead of using one arena shape.
+- Each map owns its own hunter range, base dawn timer, and difficulty offset.
+- Home map card now exposes map size, scale, difficulty, hunter count, sealed paths, and dawn duration.
 
 ### Step 5: Visual Direction Pass
 

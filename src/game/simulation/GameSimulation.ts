@@ -72,7 +72,7 @@ export class GameSimulation {
       shadow: null
     };
 
-    this.bots = this.variant.botSpawns.slice(0, Math.min(BOT_COUNT + 3, this.variant.botCount)).map((spawn, index) => ({
+    this.bots = this.variant.botSpawns.slice(0, Math.max(BOT_COUNT, this.variant.botCount)).map((spawn, index) => ({
       ...createBot(index, spawn.col, spawn.row, (x, y) => this.canSpawn(x, y, 2))
     }));
 

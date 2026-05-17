@@ -28,11 +28,15 @@ export type SpawnDef = {
 export type MapLayout = {
   id: string;
   name: string;
+  scaleLabel: 'small' | 'medium' | 'large' | 'huge';
   cols: number;
   rows: number;
   width: number;
   height: number;
   tileSize: number;
+  hunterRange: { min: number; max: number };
+  difficultyOffset: number;
+  baseDawnDurationMs: number;
   data: TileKind[][];
   playerSpawns: SpawnDef[];
   botSpawns: SpawnDef[];
@@ -126,11 +130,15 @@ const DEFAULT_SEAL_CANDIDATES: SpawnDef[] = [
 export const DEFAULT_MAP_LAYOUT: MapLayout = {
   id: 'old-village',
   name: 'Old Village',
+  scaleLabel: 'medium',
   cols: MAP_COLS,
   rows: MAP_ROWS,
   width: MAP_WIDTH,
   height: MAP_HEIGHT,
   tileSize: TILE_SIZE,
+  hunterRange: { min: 7, max: 10 },
+  difficultyOffset: 0,
+  baseDawnDurationMs: 72_000,
   data: MAP_DATA,
   playerSpawns: DEFAULT_PLAYER_SPAWNS,
   botSpawns: [...BOT_SPAWNS],
@@ -138,9 +146,11 @@ export const DEFAULT_MAP_LAYOUT: MapLayout = {
   sealCandidates: DEFAULT_SEAL_CANDIDATES
 };
 
+export const COMPACT_MAP_LAYOUT: MapLayout = createCompactLayout();
 export const EXPANDED_MAP_LAYOUT: MapLayout = createExpandedLayout();
+export const CEMETERY_MAP_LAYOUT: MapLayout = createCemeteryLayout();
 
-export const MAP_LAYOUTS: readonly MapLayout[] = [DEFAULT_MAP_LAYOUT, EXPANDED_MAP_LAYOUT];
+export const MAP_LAYOUTS: readonly MapLayout[] = [COMPACT_MAP_LAYOUT, DEFAULT_MAP_LAYOUT, EXPANDED_MAP_LAYOUT, CEMETERY_MAP_LAYOUT];
 
 export function isWallTile(col: number, row: number): boolean {
   if (row < 0 || row >= MAP_ROWS || col < 0 || col >= MAP_COLS) return true;
@@ -215,6 +225,80 @@ function clearRoadTile(map: TileKind[][], col: number, row: number): void {
       map[y][x] = TileKind.Floor;
     }
   }
+}
+
+function createCompactLayout(): MapLayout {
+  const cols = 46;
+  const rows = 28;
+  const map = createEmptyBoundedMap(cols, rows);
+
+  const roads = [
+    [3, 8, cols - 4, 8],
+    [3, 18, cols - 4, 18],
+    [11, 3, 11, rows - 4],
+    [25, 3, 25, rows - 4],
+    [37, 3, 37, rows - 4],
+    [11, 8, 25, 18],
+    [25, 18, 37, 8]
+  ];
+  for (const [x1, y1, x2, y2] of roads) carveRoadFor(map, cols, rows, x1, y1, x2, y2);
+
+  stampBuildings(map, [
+    { col: 4, row: 4, width: 6, height: 5, doors: [{ col: 8, row: 8 }] },
+    { col: 16, row: 3, width: 7, height: 6, doors: [{ col: 20, row: 8 }] },
+    { col: 30, row: 4, width: 6, height: 5, doors: [{ col: 33, row: 8 }] },
+    { col: 39, row: 10, width: 5, height: 7, doors: [{ col: 39, row: 14 }] },
+    { col: 5, row: 20, width: 7, height: 5, doors: [{ col: 10, row: 20 }] },
+    { col: 18, row: 20, width: 7, height: 5, doors: [{ col: 22, row: 20 }] },
+    { col: 31, row: 20, width: 7, height: 5, doors: [{ col: 35, row: 20 }] }
+  ]);
+
+  stampDecor(map, TileKind.Grave, [
+    { col: 15, row: 12 }, { col: 17, row: 12 }, { col: 19, row: 12 },
+    { col: 15, row: 14 }, { col: 17, row: 14 }, { col: 29, row: 15 },
+    { col: 31, row: 15 }, { col: 33, row: 15 }
+  ]);
+  stampDecor(map, TileKind.Tree, [
+    { col: 3, row: 12 }, { col: 7, row: 26 }, { col: 14, row: 4 },
+    { col: 28, row: 25 }, { col: 41, row: 5 }, { col: 43, row: 22 }
+  ]);
+
+  return {
+    id: 'chapel-square',
+    name: 'Chapel Square',
+    scaleLabel: 'small',
+    cols,
+    rows,
+    width: cols * TILE_SIZE,
+    height: rows * TILE_SIZE,
+    tileSize: TILE_SIZE,
+    hunterRange: { min: 5, max: 8 },
+    difficultyOffset: -1,
+    baseDawnDurationMs: 62_000,
+    data: map,
+    playerSpawns: [
+      { col: 8, row: 8 }, { col: 11, row: 21 }, { col: 25, row: 18 },
+      { col: 37, row: 8 }, { col: 35, row: 21 }, { col: 18, row: 8 }
+    ],
+    botSpawns: [
+      { col: 37, row: 21 }, { col: 6, row: 18 }, { col: 24, row: 6 },
+      { col: 42, row: 14 }, { col: 16, row: 17 }, { col: 31, row: 8 },
+      { col: 9, row: 24 }, { col: 29, row: 24 }
+    ],
+    lightDefs: [
+      { col: 8, row: 8, radius: 120, kind: 'lantern' },
+      { col: 22, row: 8, radius: 150, kind: 'bonfire' },
+      { col: 37, row: 8, radius: 118, kind: 'lantern' },
+      { col: 15, row: 18, radius: 122, kind: 'lantern' },
+      { col: 29, row: 18, radius: 150, kind: 'bonfire' },
+      { col: 39, row: 21, radius: 116, kind: 'lantern' }
+    ],
+    sealCandidates: [
+      { col: 11, row: 13 }, { col: 18, row: 8 }, { col: 25, row: 13 },
+      { col: 31, row: 18 }, { col: 37, row: 13 }, { col: 18, row: 18 },
+      { col: 25, row: 22 }, { col: 8, row: 18 }
+    ]
+  };
 }
 
 function createExpandedLayout(): MapLayout {
@@ -303,11 +387,15 @@ function createExpandedLayout(): MapLayout {
   return {
     id: 'grave-market',
     name: 'Grave Market',
+    scaleLabel: 'huge',
     cols,
     rows,
     width: cols * TILE_SIZE,
     height: rows * TILE_SIZE,
     tileSize: TILE_SIZE,
+    hunterRange: { min: 9, max: 13 },
+    difficultyOffset: 2,
+    baseDawnDurationMs: 86_000,
     data: map,
     playerSpawns: [
       { col: 8, row: 12 }, { col: 18, row: 36 }, { col: 32, row: 24 }, { col: 48, row: 38 },
@@ -325,6 +413,114 @@ function createExpandedLayout(): MapLayout {
       { col: 66, row: 24 }, { col: 72, row: 18 }, { col: 72, row: 31 }, { col: 41, row: 37 }
     ]
   };
+}
+
+function createCemeteryLayout(): MapLayout {
+  const cols = 72;
+  const rows = 42;
+  const map = createEmptyBoundedMap(cols, rows);
+
+  const roads = [
+    [4, 11, cols - 5, 11],
+    [4, 22, cols - 5, 22],
+    [4, 33, cols - 5, 33],
+    [14, 4, 14, rows - 5],
+    [36, 4, 36, rows - 5],
+    [58, 4, 58, rows - 5],
+    [14, 11, 36, 22],
+    [36, 22, 58, 33],
+    [58, 11, 36, 33]
+  ];
+  for (const [x1, y1, x2, y2] of roads) carveRoadFor(map, cols, rows, x1, y1, x2, y2);
+
+  stampBuildings(map, [
+    { col: 5, row: 5, width: 8, height: 6, doors: [{ col: 9, row: 10 }] },
+    { col: 20, row: 4, width: 10, height: 7, doors: [{ col: 25, row: 10 }] },
+    { col: 44, row: 5, width: 9, height: 6, doors: [{ col: 48, row: 10 }] },
+    { col: 61, row: 6, width: 7, height: 8, doors: [{ col: 61, row: 11 }] },
+    { col: 5, row: 26, width: 8, height: 8, doors: [{ col: 12, row: 31 }] },
+    { col: 22, row: 27, width: 8, height: 8, doors: [{ col: 26, row: 33 }] },
+    { col: 43, row: 27, width: 10, height: 8, doors: [{ col: 48, row: 33 }] },
+    { col: 61, row: 28, width: 7, height: 7, doors: [{ col: 61, row: 32 }] }
+  ]);
+
+  stampDecor(map, TileKind.Grave, [
+    { col: 18, row: 16 }, { col: 20, row: 16 }, { col: 22, row: 16 }, { col: 24, row: 16 },
+    { col: 18, row: 19 }, { col: 20, row: 19 }, { col: 22, row: 19 }, { col: 24, row: 19 },
+    { col: 42, row: 15 }, { col: 44, row: 15 }, { col: 46, row: 15 }, { col: 48, row: 15 },
+    { col: 42, row: 18 }, { col: 44, row: 18 }, { col: 46, row: 18 }, { col: 48, row: 18 },
+    { col: 31, row: 30 }, { col: 33, row: 31 }, { col: 35, row: 30 }, { col: 37, row: 31 }
+  ]);
+  stampDecor(map, TileKind.Tree, [
+    { col: 4, row: 16 }, { col: 9, row: 39 }, { col: 16, row: 6 }, { col: 29, row: 38 },
+    { col: 39, row: 6 }, { col: 54, row: 38 }, { col: 64, row: 17 }, { col: 68, row: 36 }
+  ]);
+
+  return {
+    id: 'moon-cemetery',
+    name: 'Moon Cemetery',
+    scaleLabel: 'large',
+    cols,
+    rows,
+    width: cols * TILE_SIZE,
+    height: rows * TILE_SIZE,
+    tileSize: TILE_SIZE,
+    hunterRange: { min: 8, max: 12 },
+    difficultyOffset: 1,
+    baseDawnDurationMs: 78_000,
+    data: map,
+    playerSpawns: [
+      { col: 10, row: 11 }, { col: 14, row: 33 }, { col: 36, row: 22 },
+      { col: 58, row: 11 }, { col: 58, row: 33 }, { col: 28, row: 12 },
+      { col: 46, row: 33 }, { col: 50, row: 22 }
+    ],
+    botSpawns: [
+      { col: 64, row: 15 }, { col: 63, row: 33 }, { col: 50, row: 11 }, { col: 45, row: 19 },
+      { col: 36, row: 33 }, { col: 23, row: 18 }, { col: 12, row: 22 }, { col: 9, row: 36 },
+      { col: 32, row: 10 }, { col: 55, row: 27 }, { col: 20, row: 33 }, { col: 67, row: 22 }
+    ],
+    lightDefs: [
+      { col: 10, row: 11, radius: 126, kind: 'lantern' },
+      { col: 24, row: 12, radius: 164, kind: 'bonfire' },
+      { col: 36, row: 22, radius: 178, kind: 'bonfire' },
+      { col: 50, row: 12, radius: 126, kind: 'lantern' },
+      { col: 58, row: 11, radius: 130, kind: 'lantern' },
+      { col: 16, row: 31, radius: 128, kind: 'lantern' },
+      { col: 34, row: 33, radius: 156, kind: 'bonfire' },
+      { col: 50, row: 33, radius: 128, kind: 'lantern' },
+      { col: 60, row: 33, radius: 162, kind: 'bonfire' }
+    ],
+    sealCandidates: [
+      { col: 14, row: 17 }, { col: 14, row: 27 }, { col: 25, row: 22 }, { col: 36, row: 16 },
+      { col: 36, row: 28 }, { col: 47, row: 22 }, { col: 58, row: 17 }, { col: 58, row: 27 },
+      { col: 25, row: 33 }, { col: 47, row: 11 }, { col: 64, row: 22 }
+    ]
+  };
+}
+
+function createEmptyBoundedMap(cols: number, rows: number): TileKind[][] {
+  const map = Array.from({ length: rows }, () => Array.from({ length: cols }, () => TileKind.Floor));
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      if (row === 0 || row === rows - 1 || col === 0 || col === cols - 1) map[row][col] = TileKind.Wall;
+    }
+  }
+  return map;
+}
+
+function stampBuildings(map: TileKind[][], buildings: readonly { col: number; row: number; width: number; height: number; doors: readonly SpawnDef[] }[]): void {
+  for (const building of buildings) {
+    for (let row = building.row; row < building.row + building.height; row += 1) {
+      for (let col = building.col; col < building.col + building.width; col += 1) map[row][col] = TileKind.Wall;
+    }
+    for (const door of building.doors) map[door.row][door.col] = TileKind.Floor;
+  }
+}
+
+function stampDecor(map: TileKind[][], kind: TileKind.Grave | TileKind.Tree, tiles: readonly SpawnDef[]): void {
+  for (const tile of tiles) {
+    if (map[tile.row]?.[tile.col] === TileKind.Floor) map[tile.row][tile.col] = kind;
+  }
 }
 
 function carveRoadFor(map: TileKind[][], cols: number, rows: number, startCol: number, startRow: number, endCol: number, endRow: number): void {

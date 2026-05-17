@@ -51,20 +51,24 @@ const VARIANT_NAMES = [
   'Broken Chapel',
   'Witching Fog',
   'Dawn Pressure',
-  'Hollow Market'
+  'Hollow Market',
+  'Moonless Graves',
+  'Raven Bells',
+  'Sealed Alleys'
 ] as const;
 
 export function createMatchVariant(input: DirectorInput): MatchVariant {
   const seed = createSeed(input);
   const rng = mulberry32(seed);
-  const difficulty = Math.min(8, 1 + Math.floor(input.matchesPlayed / 4) + Math.floor(input.playerLevel / 5));
+  const layout = chooseLayout(input.matchesPlayed, rng);
+  const difficulty = Math.max(1, Math.min(10, 1 + layout.difficultyOffset + Math.floor(input.matchesPlayed / 4) + Math.floor(input.playerLevel / 5)));
   const name = pick(VARIANT_NAMES, rng);
   const pressure = difficulty - 1;
-  const layout = chooseLayout(input.matchesPlayed, rng);
 
   const playerSpawn = pickUnique(layout.playerSpawns, 1, rng)[0];
   const botSpawns = shuffle([...layout.botSpawns, ...EXTRA_BOT_SPAWNS], rng).filter((spawn) => isInLayout(spawn, layout) && distanceTiles(spawn, playerSpawn) > 9);
-  const sealedCount = Math.min(8, 2 + Math.floor(difficulty / 2));
+  const botCount = Math.min(chooseHunterCount(layout, difficulty, rng), botSpawns.length);
+  const sealedCount = Math.min(layout.scaleLabel === 'small' ? 5 : 10, 1 + Math.floor(difficulty / 2) + (layout.scaleLabel === 'huge' ? 2 : 0));
   const sealedTiles = pickUnique(
     layout.sealCandidates.filter((tile) => distanceTiles(tile, playerSpawn) > 5),
     sealedCount,
@@ -88,12 +92,12 @@ export function createMatchVariant(input: DirectorInput): MatchVariant {
     threatLabel: threatLabel(difficulty),
     difficulty,
     layout,
-    dawnDurationMs: Math.max(42_000, 72_000 - pressure * 4_000),
-    botCount: Math.min(10, 7 + Math.floor(difficulty / 3)),
-    botSpeedMultiplier: 1 + pressure * 0.035,
-    botRangeMultiplier: 1 + pressure * 0.045,
-    botCooldownMultiplier: Math.max(0.72, 1 - pressure * 0.035),
-    lightRadiusMultiplier: 1 + pressure * 0.025,
+    dawnDurationMs: Math.max(36_000, layout.baseDawnDurationMs - pressure * 3_500),
+    botCount,
+    botSpeedMultiplier: 1 + pressure * 0.045 + (layout.scaleLabel === 'small' ? 0.02 : 0),
+    botRangeMultiplier: 1 + pressure * 0.055 + (layout.scaleLabel === 'huge' ? 0.08 : 0),
+    botCooldownMultiplier: Math.max(0.58, 1 - pressure * 0.045),
+    lightRadiusMultiplier: 1 + pressure * 0.026 - (layout.scaleLabel === 'small' ? 0.04 : 0),
     playerSpawn,
     botSpawns,
     lights,
@@ -102,8 +106,16 @@ export function createMatchVariant(input: DirectorInput): MatchVariant {
 }
 
 function chooseLayout(matchesPlayed: number, rng: () => number): MapLayout {
-  if (matchesPlayed < 2) return MAP_LAYOUTS[0];
-  return rng() < 0.48 ? MAP_LAYOUTS[1] : MAP_LAYOUTS[0];
+  if (matchesPlayed < 2) return MAP_LAYOUTS.find((layout) => layout.id === 'chapel-square') ?? MAP_LAYOUTS[0];
+  if (matchesPlayed < 5) {
+    const earlyLayouts = MAP_LAYOUTS.filter((layout) => layout.scaleLabel === 'small' || layout.scaleLabel === 'medium');
+    return pick(earlyLayouts, rng);
+  }
+  if (matchesPlayed < 10) {
+    const midLayouts = MAP_LAYOUTS.filter((layout) => layout.scaleLabel !== 'huge');
+    return pick(midLayouts, rng);
+  }
+  return pick(MAP_LAYOUTS, rng);
 }
 
 function createSeed(input: DirectorInput): number {
@@ -113,10 +125,17 @@ function createSeed(input: DirectorInput): number {
 }
 
 function threatLabel(difficulty: number): string {
+  if (difficulty >= 9) return 'Hollow';
   if (difficulty >= 7) return 'Nightmare';
   if (difficulty >= 5) return 'Severe';
   if (difficulty >= 3) return 'Rising';
   return 'Low';
+}
+
+function chooseHunterCount(layout: MapLayout, difficulty: number, rng: () => number): number {
+  const base = layout.hunterRange.min + Math.floor(difficulty / 3);
+  const variance = rng() < 0.5 ? 0 : 1;
+  return Math.max(layout.hunterRange.min, Math.min(layout.hunterRange.max, base + variance));
 }
 
 function pick<T>(items: readonly T[], rng: () => number): T {

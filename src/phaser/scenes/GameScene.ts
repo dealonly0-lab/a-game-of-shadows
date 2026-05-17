@@ -515,9 +515,10 @@ export class GameScene extends Phaser.Scene {
     this.hud.titleThreat.textContent = variant.threatLabel;
     this.hud.titleMap.innerHTML = `
       <div class="map-card__name">${layout.name}</div>
-      <div class="map-card__meta">${layout.cols}x${layout.rows} tiles - ${variant.name}</div>
+      <div class="map-card__meta">${layout.cols}x${layout.rows} tiles - ${layout.scaleLabel} - ${variant.name}</div>
       <div class="map-card__grid">
         <span>Threat</span><strong>${variant.threatLabel}</strong>
+        <span>Difficulty</span><strong>${variant.difficulty}/10</strong>
         <span>Sealed Paths</span><strong>${variant.sealedTiles.length}</strong>
         <span>Hunters</span><strong>${variant.botCount}</strong>
         <span>Dawn</span><strong>${Math.round(variant.dawnDurationMs / 1000)}s</strong>
