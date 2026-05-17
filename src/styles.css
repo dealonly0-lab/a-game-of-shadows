@@ -451,12 +451,24 @@ body {
 .cosmetic-list {
   display: grid;
   align-content: start;
-  gap: 9px;
+  gap: 14px;
   min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
   scrollbar-width: thin;
   scrollbar-color: rgba(212, 168, 67, 0.38) rgba(255, 255, 255, 0.04);
+}
+
+.cosmetic-section {
+  display: grid;
+  gap: 8px;
+}
+
+.cosmetic-section__title {
+  color: rgba(212, 168, 67, 0.78);
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
 }
 
 .cosmetic-item {
@@ -496,6 +508,12 @@ body {
   border-radius: 999px;
   background: radial-gradient(circle at 35% 30%, var(--skin-accent), var(--skin-color) 58%, #050208 100%);
   box-shadow: 0 0 18px color-mix(in srgb, var(--skin-color) 65%, transparent);
+}
+
+.cosmetic-item__swatch--beam {
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--skin-color) 28%, var(--skin-accent) 54%, var(--skin-color) 76%, transparent);
 }
 
 .cosmetic-item__body {

@@ -1,5 +1,5 @@
 import type { GameOutcome, MatchStats } from '../simulation/types';
-import { getShadowSkin } from './cosmetics';
+import { getBeamSkin, getShadowSkin } from './cosmetics';
 
 const PROFILE_VERSION = 2;
 
@@ -20,6 +20,8 @@ export type PlayerProfile = {
   contracts: DailyContract[];
   ownedShadowSkins: string[];
   equippedShadowSkin: string;
+  ownedBeamSkins: string[];
+  equippedBeamSkin: string;
 };
 
 export type ContractKind = 'matches' | 'kills' | 'hits' | 'survive' | 'wins';
@@ -69,7 +71,9 @@ export function createDefaultProfile(): PlayerProfile {
     title: 'New Shadow',
     contracts: generateDailyContracts(dayStamp()),
     ownedShadowSkins: ['blue-veil'],
-    equippedShadowSkin: 'blue-veil'
+    equippedShadowSkin: 'blue-veil',
+    ownedBeamSkins: ['pale-lantern'],
+    equippedBeamSkin: 'pale-lantern'
   };
 }
 
@@ -206,6 +210,8 @@ function normalizeProfile(profile: Partial<PlayerProfile>): PlayerProfile {
     : generateDailyContracts(today);
   const ownedShadowSkins = isLegacyEconomy ? fallback.ownedShadowSkins : normalizeOwnedSkins(profile.ownedShadowSkins);
   const equippedShadowSkin = isLegacyEconomy ? fallback.equippedShadowSkin : normalizeEquippedSkin(profile.equippedShadowSkin, ownedShadowSkins);
+  const ownedBeamSkins = normalizeOwnedBeamSkins(profile.ownedBeamSkins);
+  const equippedBeamSkin = normalizeEquippedBeamSkin(profile.equippedBeamSkin, ownedBeamSkins);
 
   return {
     version: PROFILE_VERSION,
@@ -223,7 +229,9 @@ function normalizeProfile(profile: Partial<PlayerProfile>): PlayerProfile {
     title: typeof profile.title === 'string' ? profile.title : fallback.title,
     contracts,
     ownedShadowSkins,
-    equippedShadowSkin
+    equippedShadowSkin,
+    ownedBeamSkins,
+    equippedBeamSkin
   };
 }
 
@@ -236,6 +244,17 @@ function normalizeOwnedSkins(value: unknown): string[] {
 function normalizeEquippedSkin(value: unknown, ownedValue: unknown): string {
   const owned = normalizeOwnedSkins(ownedValue);
   return typeof value === 'string' && owned.includes(value) ? value : 'blue-veil';
+}
+
+function normalizeOwnedBeamSkins(value: unknown): string[] {
+  const owned = Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+  const unique = Array.from(new Set(['pale-lantern', ...owned]));
+  return unique.filter((id) => getBeamSkin(id).id === id);
+}
+
+function normalizeEquippedBeamSkin(value: unknown, ownedValue: unknown): string {
+  const owned = normalizeOwnedBeamSkins(ownedValue);
+  return typeof value === 'string' && owned.includes(value) ? value : 'pale-lantern';
 }
 
 function normalizeContract(contract: Partial<DailyContract>): DailyContract {

@@ -9,6 +9,18 @@ export type ShadowSkin = {
   unlock?: ShadowSkinUnlock;
 };
 
+export type BeamSkin = {
+  id: string;
+  name: string;
+  rarity: 'starter' | 'rare' | 'epic';
+  cost: number;
+  trail: number;
+  glow: number;
+  core: number;
+  description: string;
+  unlock?: ShadowSkinUnlock;
+};
+
 export type ShadowSkinUnlock = {
   level?: number;
   wins?: number;
@@ -97,8 +109,69 @@ export const SHADOW_SKINS: readonly ShadowSkin[] = [
   }
 ];
 
+export const BEAM_SKINS: readonly BeamSkin[] = [
+  {
+    id: 'pale-lantern',
+    name: 'Pale Lantern',
+    rarity: 'starter',
+    cost: 0,
+    trail: 0x90ccff,
+    glow: 0xb8deff,
+    core: 0xffffff,
+    description: 'Default cold beam.'
+  },
+  {
+    id: 'ember-spark',
+    name: 'Ember Spark',
+    rarity: 'rare',
+    cost: 700,
+    trail: 0xff9a3d,
+    glow: 0xffc266,
+    core: 0xfff0c2,
+    description: 'Bonfire colored shot trail.',
+    unlock: { level: 4, totalKills: 6 }
+  },
+  {
+    id: 'grave-mist',
+    name: 'Grave Mist',
+    rarity: 'rare',
+    cost: 1100,
+    trail: 0xb497ff,
+    glow: 0xd4c1ff,
+    core: 0xf4eeff,
+    description: 'Violet cemetery beam.',
+    unlock: { level: 7, contractsCompleted: 5 }
+  },
+  {
+    id: 'moon-cut',
+    name: 'Moon Cut',
+    rarity: 'epic',
+    cost: 2600,
+    trail: 0x9ff7ff,
+    glow: 0xd0fbff,
+    core: 0xffffff,
+    description: 'Bright moonlight shot for winners.',
+    unlock: { level: 11, wins: 3, bestKills: 3 }
+  },
+  {
+    id: 'blood-vow',
+    name: 'Blood Vow',
+    rarity: 'epic',
+    cost: 3800,
+    trail: 0xff3f4a,
+    glow: 0xff7a66,
+    core: 0xfff1e8,
+    description: 'Aggressive red beam trail.',
+    unlock: { level: 16, totalKills: 50, bestKills: 5 }
+  }
+];
+
 export function getShadowSkin(id: string): ShadowSkin {
   return SHADOW_SKINS.find((skin) => skin.id === id) ?? SHADOW_SKINS[0];
+}
+
+export function getBeamSkin(id: string): BeamSkin {
+  return BEAM_SKINS.find((skin) => skin.id === id) ?? BEAM_SKINS[0];
 }
 
 export function canUnlockSkin(skin: ShadowSkin, profile: CosmeticProfile): boolean {
@@ -106,7 +179,18 @@ export function canUnlockSkin(skin: ShadowSkin, profile: CosmeticProfile): boole
 }
 
 export function getSkinUnlockReasons(skin: ShadowSkin, profile: CosmeticProfile): string[] {
-  const unlock = skin.unlock;
+  return getUnlockReasons(skin.unlock, profile);
+}
+
+export function canUnlockBeam(skin: BeamSkin, profile: CosmeticProfile): boolean {
+  return getBeamUnlockReasons(skin, profile).length === 0;
+}
+
+export function getBeamUnlockReasons(skin: BeamSkin, profile: CosmeticProfile): string[] {
+  return getUnlockReasons(skin.unlock, profile);
+}
+
+function getUnlockReasons(unlock: ShadowSkinUnlock | undefined, profile: CosmeticProfile): string[] {
   if (!unlock) return [];
 
   const reasons: string[] = [];

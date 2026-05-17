@@ -354,6 +354,8 @@ Checkpoint 2026-05-17:
 
 ### Step 2: Content Inventory Expansion
 
+Status: in progress
+
 Goal:
 
 - Give players more things to chase before multiplayer exists.
@@ -379,6 +381,13 @@ Exit check:
 
 - Home hub shows enough locked and unlocked items to feel like a real progression system.
 - Equipped items visibly affect the match without changing gameplay balance.
+
+Checkpoint 2026-05-17:
+
+- Added Beam Colors as a second local cosmetic category.
+- Profile now stores owned and equipped beam cosmetic IDs.
+- Loadout panel now groups Shadow Forms and Beam Colors.
+- Equipped beam cosmetic changes player projectile trail, glow, and core color.
 
 ### Step 3: Home Hub Rework Into Sections
 

@@ -5,7 +5,7 @@ import { TILE_SIZE, TileKind } from '../../game/content/villageMap';
 import { buildWallSegments, Raycaster } from '../../game/simulation/raycast';
 import type { Entity, InputActionState, LightSource } from '../../game/simulation/types';
 import { applyMatchRewards, loadProfile, saveProfile, type MatchRewards, type PlayerProfile, xpProgressInLevel } from '../../game/progression/profile';
-import { canUnlockSkin, getShadowSkin, getSkinUnlockReasons, SHADOW_SKINS } from '../../game/progression/cosmetics';
+import { BEAM_SKINS, canUnlockBeam, canUnlockSkin, getBeamSkin, getBeamUnlockReasons, getShadowSkin, getSkinUnlockReasons, SHADOW_SKINS } from '../../game/progression/cosmetics';
 import { GameAudio } from '../audio/GameAudio';
 
 type ImpactRipple = {
@@ -195,7 +195,7 @@ export class GameScene extends Phaser.Scene {
         </aside>
         <aside class="home-panel home-panel--cosmetics">
           <div class="home-panel__header">
-            <span>Shadow Forms</span>
+            <span>Loadout</span>
             <strong>Embers</strong>
           </div>
           <div id="title-cosmetics" class="cosmetic-list"></div>
@@ -407,7 +407,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private renderCosmetics(): void {
-    this.hud.titleCosmetics.innerHTML = SHADOW_SKINS.map((skin) => {
+    const shadowItems = SHADOW_SKINS.map((skin) => {
       const owned = this.profile.ownedShadowSkins.includes(skin.id);
       const equipped = this.profile.equippedShadowSkin === skin.id;
       const affordable = this.profile.embers >= skin.cost;
@@ -419,7 +419,7 @@ export class GameScene extends Phaser.Scene {
         ? `locked - ${unlockReasons.join(', ')} - ${skin.cost} embers`
         : `${skin.rarity} - ${skin.description}`;
       return `
-        <button class="cosmetic-item ${equipped ? 'is-equipped' : ''} ${gated && !owned ? 'is-locked' : ''}" type="button" data-action="${action}" data-skin="${skin.id}" ${equipped || (!owned && (!affordable || gated)) ? 'disabled' : ''}>
+        <button class="cosmetic-item ${equipped ? 'is-equipped' : ''} ${gated && !owned ? 'is-locked' : ''}" type="button" data-kind="shadow" data-action="${action}" data-skin="${skin.id}" ${equipped || (!owned && (!affordable || gated)) ? 'disabled' : ''}>
           <span class="cosmetic-item__swatch" style="--skin-color: #${skin.color.toString(16).padStart(6, '0')}; --skin-accent: #${skin.accent.toString(16).padStart(6, '0')}"></span>
           <span class="cosmetic-item__body">
             <strong>${skin.name}</strong>
@@ -429,6 +429,40 @@ export class GameScene extends Phaser.Scene {
         </button>
       `;
     }).join('');
+
+    const beamItems = BEAM_SKINS.map((skin) => {
+      const owned = this.profile.ownedBeamSkins.includes(skin.id);
+      const equipped = this.profile.equippedBeamSkin === skin.id;
+      const affordable = this.profile.embers >= skin.cost;
+      const unlockReasons = getBeamUnlockReasons(skin, this.profile);
+      const gated = unlockReasons.length > 0;
+      const action = owned ? 'equip' : 'unlock';
+      const label = equipped ? 'Equipped' : owned ? 'Equip' : gated ? unlockReasons[0] : `${skin.cost} Embers`;
+      const detail = gated
+        ? `locked - ${unlockReasons.join(', ')} - ${skin.cost} embers`
+        : `${skin.rarity} - ${skin.description}`;
+      return `
+        <button class="cosmetic-item ${equipped ? 'is-equipped' : ''} ${gated && !owned ? 'is-locked' : ''}" type="button" data-kind="beam" data-action="${action}" data-skin="${skin.id}" ${equipped || (!owned && (!affordable || gated)) ? 'disabled' : ''}>
+          <span class="cosmetic-item__swatch cosmetic-item__swatch--beam" style="--skin-color: #${skin.trail.toString(16).padStart(6, '0')}; --skin-accent: #${skin.core.toString(16).padStart(6, '0')}"></span>
+          <span class="cosmetic-item__body">
+            <strong>${skin.name}</strong>
+            <span>${detail}</span>
+          </span>
+          <span class="cosmetic-item__action">${label}</span>
+        </button>
+      `;
+    }).join('');
+
+    this.hud.titleCosmetics.innerHTML = `
+      <div class="cosmetic-section">
+        <div class="cosmetic-section__title">Shadow Forms</div>
+        ${shadowItems}
+      </div>
+      <div class="cosmetic-section">
+        <div class="cosmetic-section__title">Beam Colors</div>
+        ${beamItems}
+      </div>
+    `;
   }
 
   private handleCosmeticClick(event: Event): void {
@@ -437,10 +471,26 @@ export class GameScene extends Phaser.Scene {
 
     const skinId = button.dataset.skin;
     const action = button.dataset.action;
+    const kind = button.dataset.kind;
     if (!skinId) return;
 
-    const skin = getShadowSkin(skinId);
-    if (action === 'unlock') {
+    if (kind === 'beam') {
+      const skin = getBeamSkin(skinId);
+      if (action === 'unlock') {
+        if (this.profile.ownedBeamSkins.includes(skin.id) || this.profile.embers < skin.cost || !canUnlockBeam(skin, this.profile)) return;
+        this.profile = {
+          ...this.profile,
+          embers: this.profile.embers - skin.cost,
+          ownedBeamSkins: [...this.profile.ownedBeamSkins, skin.id],
+          equippedBeamSkin: skin.id
+        };
+      } else if (action === 'equip') {
+        if (!this.profile.ownedBeamSkins.includes(skin.id)) return;
+        this.profile = { ...this.profile, equippedBeamSkin: skin.id };
+      }
+    } else {
+      const skin = getShadowSkin(skinId);
+      if (action === 'unlock') {
       if (this.profile.ownedShadowSkins.includes(skin.id) || this.profile.embers < skin.cost || !canUnlockSkin(skin, this.profile)) return;
       this.profile = {
         ...this.profile,
@@ -448,9 +498,10 @@ export class GameScene extends Phaser.Scene {
         ownedShadowSkins: [...this.profile.ownedShadowSkins, skin.id],
         equippedShadowSkin: skin.id
       };
-    } else if (action === 'equip') {
-      if (!this.profile.ownedShadowSkins.includes(skin.id)) return;
-      this.profile = { ...this.profile, equippedShadowSkin: skin.id };
+      } else if (action === 'equip') {
+        if (!this.profile.ownedShadowSkins.includes(skin.id)) return;
+        this.profile = { ...this.profile, equippedShadowSkin: skin.id };
+      }
     }
 
     saveProfile(this.profile);
@@ -734,16 +785,18 @@ export class GameScene extends Phaser.Scene {
 
   private renderProjectiles(): void {
     const g = this.projectileLayer.clear();
+    const playerBeam = getBeamSkin(this.profile.equippedBeamSkin);
     for (const projectile of this.simulation.projectiles) {
+      const beam = projectile.ownerId === 'player' ? playerBeam : BEAM_SKINS[0];
       for (let i = 1; i < projectile.trail.length; i += 1) {
         const t = i / projectile.trail.length;
-        g.lineStyle(t * 5, 0x90ccff, t * 0.5);
+        g.lineStyle(t * 5, beam.trail, t * 0.5);
         g.lineBetween(projectile.trail[i - 1].x, projectile.trail[i - 1].y, projectile.trail[i].x, projectile.trail[i].y);
       }
 
-      g.fillStyle(0xb8deff, 0.35).fillCircle(projectile.x, projectile.y, 16);
-      g.fillStyle(0xddeeff, 0.8).fillCircle(projectile.x, projectile.y, 7);
-      g.fillStyle(0xffffff, 1).fillCircle(projectile.x, projectile.y, 3);
+      g.fillStyle(beam.glow, 0.35).fillCircle(projectile.x, projectile.y, 16);
+      g.fillStyle(beam.trail, 0.8).fillCircle(projectile.x, projectile.y, 7);
+      g.fillStyle(beam.core, 1).fillCircle(projectile.x, projectile.y, 3);
     }
   }
 
